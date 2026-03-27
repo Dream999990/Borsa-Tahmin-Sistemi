@@ -26,7 +26,7 @@ def create_lstm_model(input_shape):
 def train_model(df, ticker):
     """Veriyi hazırlar ve modeli eğitip kaydeder."""
     # Sadece kapanış fiyatlarını (Close) kullanıyoruz
-    data = df.filter(['Close']).values
+    data = df[['Close']].values
     
     # Veriyi ölçeklendir (Yapay zeka 0-1 arasını daha iyi anlar)
     scaler = MinMaxScaler(feature_range=(0,1))
