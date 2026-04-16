@@ -13,17 +13,18 @@
         .sentiment-positive { color: #28a745; font-weight: bold; }
         .sentiment-negative { color: #dc3545; font-weight: bold; }
         
-        /* Grafik boyutu burada dizginleniyor */
         .chart-container { 
             background: white; 
             border-radius: 15px; 
             padding: 20px; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
             position: relative; 
-            height: 450px; /* Sabit yükseklik taşmayı engeller */
+            height: 450px; 
             width: 100%;
         }
         .header-section { margin-bottom: 40px; }
+        .news-item { border-left: 4px solid #0d6efd; transition: all 0.2s; }
+        .news-item:hover { background-color: #f1f7ff !important; }
     </style>
 </head>
 <body>
@@ -35,10 +36,13 @@
 
         <div class="row justify-content-center">
             <div class="col-md-6">
-                <form method="POST" class="input-group mb-4 shadow-sm" style="border-radius: 10px; overflow: hidden;">
+                <form method="POST" class="input-group mb-4 shadow-sm" style="border-radius: 10px; overflow: hidden;" id="stockForm">
                     {% csrf_token %}
                     <input type="text" name="ticker" class="form-control border-0 p-3" placeholder="Hisse Kodu (Örn: NVDA, TSLA)" required>
-                    <button class="btn btn-primary px-4" type="submit">Analiz Et</button>
+                    <button class="btn btn-primary px-4 d-flex align-items-center" type="submit" id="analyzeBtn">
+                        <span id="btnText">Analiz Et</span>
+                        <div id="btnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></div>
+                    </button>
                 </form>
             </div>
         </div>
@@ -81,7 +85,7 @@
             </div>
         </div>
 
-        <div class="row mt-5 mb-5">
+        <div class="row mt-5">
             <div class="col-12">
                 <div class="chart-container">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -92,10 +96,41 @@
                 </div>
             </div>
         </div>
+
+        <div class="row mt-5 mb-5">
+            <div class="col-12">
+                <div class="card stock-card p-4">
+                    <h4 class="mb-4 text-dark">Analiz Edilen Son Haberler</h4>
+                    <div class="list-group list-group-flush">
+                        {% if news_list %}
+                            {% for title, date in news_list %}
+                            <div class="list-group-item bg-transparent px-3 py-3 mb-2 news-item shadow-sm rounded">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <h6 class="mb-1 fw-bold text-dark">{{ title }}</h6>
+                                    <small class="text-muted ms-2">{{ date|slice:":10" }}</small>
+                                </div>
+                                <small class="text-primary">NewsAPI Kaynağı</small>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">Bu hisse için güncel haber bulunamadı.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
         {% endif %}
     </div>
 
 <script>
+    // 1. Loading Spinner Mantığı
+    document.getElementById('stockForm').onsubmit = function() {
+        document.getElementById('btnText').innerText = "Analiz Ediliyor...";
+        document.getElementById('btnSpinner').classList.remove('d-none');
+        document.getElementById('analyzeBtn').disabled = true;
+    };
+
+    // 2. Grafik Mantığı
     const chartDatesRaw = '{{ chart_dates|safe|escapejs }}';
     
     if (chartDatesRaw && chartDatesRaw !== 'None' && chartDatesRaw !== '[]') {
@@ -133,7 +168,7 @@
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false, // Kabın boyuna uyması için kritik
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { position: 'top' }
                 },

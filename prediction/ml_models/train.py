@@ -6,48 +6,62 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 import os
 
 def create_lstm_model(input_shape):
-    """LSTM Model mimarisini kurar."""
+    """Gelişmiş LSTM Model mimarisi."""
     model = Sequential([
-        # İlk katman: Verideki zaman serisi kalıplarını yakalar
-        LSTM(units=50, return_sequences=True, input_shape=input_shape),
-        Dropout(0.2), # Ezberlemeyi (overfitting) önlemek için %20 nöronu kapat
-        
-        # İkinci katman: Daha derin özellikler
-        LSTM(units=50, return_sequences=False),
+        # input_shape artık (60, 4) olacak (Close, Volume, SMA, RSI)
+        LSTM(units=64, return_sequences=True, input_shape=input_shape),
         Dropout(0.2),
         
-        # Çıkış katmanı: Tahmin edilen fiyat
-        Dense(units=25),
-        Dense(units=1)
+        LSTM(units=64, return_sequences=False),
+        Dropout(0.2),
+        
+        Dense(units=32, activation='relu'),
+        Dense(units=1) # Sonuç yine tek: Gelecek fiyat
     ])
     model.compile(optimizer='adam', loss='mean_squared_error')
     return model
 
 def train_model(df, ticker):
-    """Veriyi hazırlar ve modeli eğitip kaydeder."""
-    # Sadece kapanış fiyatlarını (Close) kullanıyoruz
-    data = df[['Close']].values
+    """Çok değişkenli veriyi hazırlar ve modeli eğitir."""
     
-    # Veriyi ölçeklendir (Yapay zeka 0-1 arasını daha iyi anlar)
+    # 1. Özellik seçimi (Feature Selection)
+    # NaN değerleri (SMA ve RSI ilk günlerde NaN olur) temizleyelim
+    features = df[['Close', 'Volume', 'SMA_20', 'RSI']].bfill().ffill()
+    data = features.values
+    
+    # 2. Veriyi ölçeklendir
+    # ÖNEMLİ: Her sütun kendi içinde 0-1 arasına çekilir
     scaler = MinMaxScaler(feature_range=(0,1))
     scaled_data = scaler.fit_transform(data)
     
-    # Son 60 günü kullanarak bir sonraki günü tahmin etme yapısı
+    # 3. Eğitim setini oluştur (X: Tüm özellikler, y: Sadece Close fiyatı)
     X_train, y_train = [], []
-    for i in range(60, len(scaled_data)):
-        X_train.append(scaled_data[i-60:i, 0])
+    prediction_days = 60 # Geçmiş 60 gün
+    
+    for i in range(prediction_days, len(scaled_data)):
+        # X_train: Son 60 günün 4 verisi (Close, Vol, SMA, RSI)
+        X_train.append(scaled_data[i-prediction_days:i, :]) 
+        # y_train: Sadece hedef günün Close fiyatı (0. sütun)
         y_train.append(scaled_data[i, 0])
         
     X_train, y_train = np.array(X_train), np.array(y_train)
-    X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
     
-    # Modeli oluştur ve eğit
-    model = create_lstm_model((X_train.shape[1], 1))
-    model.fit(X_train, y_train, batch_size=1, epochs=5) # Şimdilik hızlı olması için 5 epoch
+    # 4. Modeli eğit
+    # X_train shape: (Örnek Sayısı, 60, 4)
+    model = create_lstm_model((X_train.shape[1], X_train.shape[2]))
     
-    # Modeli kaydet
-    save_path = f"prediction/ml_models/saved_models/{ticker}_model.h5"
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    model.save(save_path)
+    print(f"🚀 {ticker} için Çok Değişkenli Model eğitiliyor...")
+    model.fit(X_train, y_train, batch_size=32, epochs=10) # Daha stabil olması için batch_size 32
+    
+    # 5. Modeli ve Scaler'ı kaydet
+    # ÖNEMLİ: Scaler'ı da kaydetmeliyiz çünkü tahminde aynı ölçek lazım
+    save_dir = "prediction/ml_models/saved_models/"
+    os.makedirs(save_dir, exist_ok=True)
+    
+    model.save(f"{save_dir}{ticker}_model.h5")
+    
+    # Scaler'ı bir dosyaya kaydedelim (Tahmin sırasında kullanmak için)
+    import joblib
+    joblib.dump(scaler, f"{save_dir}{ticker}_scaler.pkl")
     
     return model, scaler
