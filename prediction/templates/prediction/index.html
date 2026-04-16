@@ -13,6 +13,33 @@
         .sentiment-positive { color: #28a745; font-weight: bold; }
         .sentiment-negative { color: #dc3545; font-weight: bold; }
         
+        /* Arama Alanı ve Autocomplete Stilleri */
+        .search-container { position: relative; width: 100%; }
+        .autocomplete-items {
+            position: absolute;
+            border: 1px solid #d4d4d4;
+            border-top: none;
+            z-index: 999;
+            top: 100%;
+            left: 0;
+            right: 0;
+            border-radius: 0 0 15px 15px;
+            max-height: 250px;
+            overflow-y: auto;
+            background: white;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        .autocomplete-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f8f9fa;
+        }
+        .autocomplete-item:hover { background-color: #f1f7ff; }
+        .autocomplete-item strong { color: #0d6efd; }
+
         .chart-container { 
             background: white; 
             border-radius: 15px; 
@@ -25,6 +52,7 @@
         .header-section { margin-bottom: 40px; }
         .news-item { border-left: 4px solid #0d6efd; transition: all 0.2s; }
         .news-item:hover { background-color: #f1f7ff !important; }
+        .progress { background-color: #e9ecef; border-radius: 10px; height: 10px; }
     </style>
 </head>
 <body>
@@ -35,15 +63,29 @@
         </div>
 
         <div class="row justify-content-center">
-            <div class="col-md-6">
-                <form method="POST" class="input-group mb-4 shadow-sm" style="border-radius: 10px; overflow: hidden;" id="stockForm">
-                    {% csrf_token %}
-                    <input type="text" name="ticker" class="form-control border-0 p-3" placeholder="Hisse Kodu (Örn: NVDA, TSLA)" required>
-                    <button class="btn btn-primary px-4 d-flex align-items-center" type="submit" id="analyzeBtn">
-                        <span id="btnText">Analiz Et</span>
-                        <div id="btnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></div>
-                    </button>
-                </form>
+            <div class="col-md-7">
+                <div class="search-container">
+                    <form method="POST" class="input-group shadow-sm" style="border-radius: 15px; overflow: hidden;" id="stockForm">
+                        {% csrf_token %}
+                        <input type="text" name="ticker" id="tickerInput" class="form-control border-0 p-3" 
+                               placeholder="Şirket adı veya kod yazın (Örn: Apple, NVDA, THYAO...)" 
+                               autocomplete="off" required>
+                        <button class="btn btn-primary px-4 d-flex align-items-center" type="submit" id="analyzeBtn">
+                            <span id="btnText">Analiz Et</span>
+                            <div id="btnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></div>
+                        </button>
+                    </form>
+                    <div id="autocomplete-list" class="autocomplete-items"></div>
+                </div>
+
+                <div class="text-center mt-3 mb-4">
+                    <small class="text-muted fw-bold me-2">POPÜLER:</small>
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 me-1 quick-pick" data-ticker="NVDA">NVDA</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 me-1 quick-pick" data-ticker="TSLA">TSLA</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 me-1 quick-pick" data-ticker="AAPL">AAPL</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 me-1 quick-pick" data-ticker="THYAO.IS">THY</button>
+                    <button type="button" class="btn btn-sm btn-outline-dark rounded-pill px-3 quick-pick" data-ticker="BTC-USD">Bitcoin</button>
+                </div>
             </div>
         </div>
 
@@ -85,6 +127,32 @@
             </div>
         </div>
 
+        {% if accuracy != "N/A" %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card stock-card border-start border-5 border-{{ signal_class }}" style="background: linear-gradient(to right, #ffffff, #fcfcfc);">
+                    <div class="card-body p-4">
+                        <div class="row align-items-center text-center">
+                            <div class="col-md-6 border-end">
+                                <h6 class="text-secondary text-uppercase small fw-bold">Model Güven Endeksi</h6>
+                                <h2 class="display-6 fw-bold mb-1">%{{ accuracy }}</h2>
+                                <div class="progress mx-auto" style="width: 60%;">
+                                    <div class="progress-bar bg-{{ signal_class }}" role="progressbar" style='width: {{ accuracy }}%;'></div>
+                                </div>
+                                <p class="text-muted small mt-2 mb-0">Geçmiş verilerdeki tahmin başarısı</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-secondary text-uppercase small fw-bold">Teknik Karar Özeti</h6>
+                                <h2 class="display-5 fw-bold text-{{ signal_class }} mb-0">{{ signal_text }}</h2>
+                                <p class="text-muted small mt-2 mb-0">AI, RSI ve Trend Kombinasyonu</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="row mt-5">
             <div class="col-12">
                 <div class="chart-container">
@@ -109,11 +177,11 @@
                                     <h6 class="mb-1 fw-bold text-dark">{{ title }}</h6>
                                     <small class="text-muted ms-2">{{ date|slice:":10" }}</small>
                                 </div>
-                                <small class="text-primary">NewsAPI Kaynağı</small>
+                                <small class="text-primary">Haber Kaynağı Analizi</small>
                             </div>
                             {% endfor %}
                         {% else %}
-                            <p class="text-muted">Bu hisse için güncel haber bulunamadı.</p>
+                            <p class="text-muted px-3">Bu hisse için güncel haber bulunamadı.</p>
                         {% endif %}
                     </div>
                 </div>
@@ -123,64 +191,128 @@
     </div>
 
 <script>
-    // 1. Loading Spinner Mantığı
+    // --- 1. KAPSAMLI HİSSE LİSTESİ VE AUTOCOMPLETE ---
+    const stocks = [
+        { s: "NVDA", n: "NVIDIA Corporation" },
+        { s: "TSLA", n: "Tesla, Inc." },
+        { s: "AAPL", n: "Apple Inc." },
+        { s: "MSFT", n: "Microsoft Corporation" },
+        { s: "GOOGL", n: "Alphabet Inc. (Google)" },
+        { s: "AMZN", n: "Amazon.com, Inc." },
+        { s: "META", n: "Meta Platforms (Facebook)" },
+        { s: "NFLX", n: "Netflix, Inc." },
+        { s: "AMD", n: "Advanced Micro Devices" },
+        { s: "THYAO.IS", n: "Türk Hava Yolları" },
+        { s: "ASELS.IS", n: "Aselsan" },
+        { s: "EREGL.IS", n: "Erdemir" },
+        { s: "GARAN.IS", n: "Garanti Bankası" },
+        { s: "SISE.IS", n: "Şişecam" },
+        { s: "BTC-USD", n: "Bitcoin" },
+        { s: "ETH-USD", n: "Ethereum" },
+        { s: "KO", n: "Coca-Cola Company" },
+        { s: "PEP", n: "PepsiCo, Inc." },
+        { s: "NIO", n: "NIO Inc." },
+        { s: "PLTR", n: "Palantir Technologies" }
+    ];
+
+    const tickerInput = document.getElementById('tickerInput');
+    const autocompleteList = document.getElementById('autocomplete-list');
+
+    tickerInput.addEventListener('input', function() {
+        const val = this.value.toUpperCase();
+        autocompleteList.innerHTML = '';
+        if (!val) return;
+
+        const filtered = stocks.filter(stock => 
+            stock.s.includes(val) || stock.n.toUpperCase().includes(val)
+        ).slice(0, 8);
+
+        filtered.forEach(stock => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+            item.innerHTML = `<span><strong>${stock.s}</strong> - ${stock.n}</span>`;
+            item.addEventListener('click', () => {
+                tickerInput.value = stock.s;
+                autocompleteList.innerHTML = '';
+                document.getElementById('stockForm').submit();
+            });
+            autocompleteList.appendChild(item);
+        });
+    });
+
+    // Liste dışına tıklayınca kapat
+    document.addEventListener('click', (e) => {
+        if (e.target !== tickerInput) autocompleteList.innerHTML = '';
+    });
+
+    // Hızlı Seçim Butonları
+    document.querySelectorAll('.quick-pick').forEach(btn => {
+        btn.addEventListener('click', function() {
+            tickerInput.value = this.dataset.ticker;
+            document.getElementById('stockForm').submit();
+        });
+    });
+
+    // --- 2. FORM SUBMIT LOADING ---
     document.getElementById('stockForm').onsubmit = function() {
         document.getElementById('btnText').innerText = "Analiz Ediliyor...";
         document.getElementById('btnSpinner').classList.remove('d-none');
         document.getElementById('analyzeBtn').disabled = true;
     };
 
-    // 2. Grafik Mantığı
-    const chartDatesRaw = '{{ chart_dates|safe|escapejs }}';
-    
-    if (chartDatesRaw && chartDatesRaw !== 'None' && chartDatesRaw !== '[]') {
-        const chartDates = JSON.parse(chartDatesRaw.replace(/'/g, '"'));
-        const chartPrices = JSON.parse('{{ chart_prices|safe }}');
-        const chartSma = JSON.parse('{{ chart_sma|safe }}');
+    // --- 3. GRAFİK ÇİZİMİ ---
+    (function() {
+        try {
+            const labels = {{ chart_dates|safe|default:"[]" }};
+            const prices = {{ chart_prices|safe|default:"[]" }};
+            const sma = {{ chart_sma|safe|default:"[]" }};
 
-        const ctx = document.getElementById('stockChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: chartDates,
-                datasets: [
-                    {
-                        label: 'Kapanış Fiyatı',
-                        data: chartPrices,
-                        borderColor: '#0d6efd',
-                        backgroundColor: 'rgba(13, 110, 253, 0.05)',
-                        borderWidth: 3,
-                        pointRadius: 4,
-                        fill: true,
-                        tension: 0.3
+            if (labels.length > 0) {
+                const ctx = document.getElementById('stockChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Kapanış Fiyatı',
+                                data: prices,
+                                borderColor: '#0d6efd',
+                                backgroundColor: 'rgba(13, 110, 253, 0.05)',
+                                borderWidth: 3,
+                                pointRadius: 4,
+                                fill: true,
+                                tension: 0.3
+                            },
+                            {
+                                label: 'SMA 20 (Trend)',
+                                data: sma,
+                                borderColor: '#ffc107',
+                                borderDash: [5, 5],
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.3
+                            }
+                        ]
                     },
-                    {
-                        label: 'SMA 20 (Trend)',
-                        data: chartSma,
-                        borderColor: '#ffc107',
-                        borderDash: [5, 5],
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        fill: false,
-                        tension: 0.3
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            y: { 
+                                beginAtZero: false,
+                                ticks: { callback: function(value) { return '$' + value; } }
+                            }
+                        } 
                     }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'top' }
-                },
-                scales: {
-                    y: { 
-                        beginAtZero: false,
-                        ticks: { callback: function(value) { return '$' + value; } }
-                    }
-                }
+                });
             }
-        });
-    }
+        } catch (e) {
+            console.error("Grafik hatası:", e);
+        }
+    })();
 </script>
 </body>
 </html>

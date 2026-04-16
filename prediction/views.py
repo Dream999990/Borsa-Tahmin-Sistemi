@@ -12,20 +12,19 @@ def limit_saved_models(max_models=3):
     """Sistemdeki model sayısını sınırlar, en eski olanı siler."""
     model_dir = "prediction/ml_models/saved_models/"
     
-    # Klasör yoksa fonksiyondan çık
+    # Klasör yoksa oluştur, hata alma
     if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
         return
 
     # Klasördeki tüm .h5 dosyalarını listele
     models = glob.glob(os.path.join(model_dir, "*.h5"))
     
-    # Eğer model sayısı sınırı aşıyorsa (Sınırı max_models - 1 yapıyoruz ki yeniye yer açılsın)
+    # Eğer model sayısı sınırı aşıyorsa yeniye yer açmak için en eskiyi sil
     if len(models) >= max_models:
-        # Dosyaları oluşturulma zamanına göre sırala (en eski en başta)
         models.sort(key=os.path.getmtime)
         
-        # Sınırı aşan miktarda eski modeli sil
-        # Örn: 3 model var, sınır 3. 1 tanesini silmeliyiz.
+        # Sınırı aşanları temizle
         num_to_delete = len(models) - max_models + 1
         for i in range(num_to_delete):
             oldest_model = models[i]
@@ -34,9 +33,14 @@ def limit_saved_models(max_models=3):
             try:
                 os.remove(oldest_model) # .h5 siler
                 scaler_path = oldest_model.replace(".h5", ".pkl")
+                acc_path = oldest_model.replace(".h5", ".accuracy.txt")
+                
                 if os.path.exists(scaler_path):
                     os.remove(scaler_path) # .pkl siler
-                print(f"♻️ Hafıza yönetimi: En eski model ({ticker_to_delete}) temizlendi.")
+                if os.path.exists(acc_path):
+                    os.remove(acc_path) # .txt siler
+                    
+                print(f"♻️ Hafıza yönetimi: {ticker_to_delete} modeli temizlendi.")
             except Exception as e:
                 print(f"⚠️ Temizlik hatası: {e}")
 
@@ -51,11 +55,11 @@ def index(request):
             model_path = f"prediction/ml_models/saved_models/{ticker}_model.h5"
             
             if not os.path.exists(model_path):
-                # YENİ: Model eğitilmeden hemen önce temizlik yap
+                # Yeni model eğitimi öncesi hafıza temizliği
                 limit_saved_models(max_models=3) 
                 
                 if len(df) > 60:
-                    print(f"🧠 {ticker} için yeni model eğitiliyor...")
+                    print(f"🧠 {ticker} için Multivariate LSTM eğitiliyor...")
                     train_model(df, ticker)
                 else:
                     context['error'] = "Yeterli veri yok (En az 60 gün gerekli)."
@@ -69,23 +73,31 @@ def index(request):
                 print(f"⚠️ Fiyat çekme hatası: {e}")
                 last_price = 0.0
             
-            # 3. Grafik İçin Veri Hazırlama
+            # 3. Grafik İçin Veri Hazırlama (Son 30 İş Günü)
             recent_df = df.tail(30)
             chart_dates = recent_df.index.strftime('%Y-%m-%d').tolist()
             chart_prices = [round(float(p), 2) for p in recent_df['Close'].values.flatten()]
             chart_sma = [round(float(s), 2) if not np.isnan(s) else None for s in recent_df['SMA_20'].values.flatten()]
 
-            # 4. Haberleri Çekme
+            # 4. Haber Analizi
             raw_news = get_stock_news(ticker)
-
             sentiment_score = analyze_sentiment(ticker)
-            prediction = get_prediction(ticker, df)
+
+            # 5. Gelişmiş Tahmin ve Sinyal Mekanizması
+            # prediction: Tahmin fiyatı
+            # accuracy: Modelin başarı yüzdesi
+            # signal_text: Al/Sat mesajı
+            # signal_class: Bootstrap renk sınıfı (success, danger vb.)
+            prediction, accuracy, signal_text, signal_class = get_prediction(ticker, df)
             
             context = {
                 'ticker': ticker,
                 'last_price': last_price,
                 'sentiment': sentiment_score,
                 'prediction': prediction,
+                'accuracy': accuracy,
+                'signal_text': signal_text,
+                'signal_class': signal_class,
                 'chart_dates': chart_dates,
                 'chart_prices': chart_prices,
                 'chart_sma': chart_sma,
