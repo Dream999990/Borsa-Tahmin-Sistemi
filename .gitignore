@@ -205,3 +205,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Generated model outputs
+prediction/ml_models/saved_models/
+
+# Local report files
+*.docx

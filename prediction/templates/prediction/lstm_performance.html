@@ -1,0 +1,602 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LSTM Performansi | Borsa Terminali</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{% static 'prediction/css/dashboard.css' %}" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background:#05070b; color:#f2f5f9; font-family:"Segoe UI",Arial,sans-serif; }
+        .shell { max-width:1280px; margin:0 auto; padding:28px 18px 52px; }
+        .panel,.metric-card { background:linear-gradient(180deg,#121a27,#0d121c); border:1px solid #243044; border-radius:8px; box-shadow:0 16px 38px rgba(0,0,0,.28); }
+        .muted { color:#7f8da3; }
+        .accent { color:#f0b90b; }
+        .terminal-btn { display:inline-flex; border:1px solid #34435a; background:#0a1019; color:#c8d4e4; border-radius:8px; padding:10px 13px; font-weight:850; text-decoration:none; }
+        .terminal-btn:hover { background:#f0b90b; border-color:#f0b90b; color:#0b0d10; }
+        .form-control { background:#070b12; border-color:#2b3a52; color:#f2f5f9; min-height:48px; }
+        .form-control:focus { background:#070b12; color:#f2f5f9; border-color:#f0b90b; box-shadow:0 0 0 .2rem rgba(240,185,11,.15); }
+        .metric-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; }
+        .metric-card { padding:16px; }
+        .metric-label { color:#7f8da3; font-size:.78rem; font-weight:800; text-transform:uppercase; }
+        .metric-value { font-family:"SFMono-Regular",Consolas,monospace; font-size:1.75rem; font-weight:900; }
+        .chart-grid { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
+        .chart-wrap { height:360px; position:relative; }
+        .chart-wrap.tall { height:420px; }
+        .info-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+        .info-box { background:#0a1019; border:1px solid #263449; border-radius:8px; padding:14px; }
+        .comparison-table { width:100%; border-collapse:collapse; color:#d8e2ef; }
+        .comparison-table th,.comparison-table td { border-bottom:1px solid #263449; padding:10px; text-align:left; }
+        .comparison-table th { color:#7f8da3; font-size:.78rem; text-transform:uppercase; }
+        .best-badge { display:inline-flex; background:#f0b90b; color:#0b0d10; border-radius:999px; padding:4px 9px; font-weight:900; font-size:.78rem; }
+        .report-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+        .formula { color:#9fb0c6; font-family:"SFMono-Regular",Consolas,monospace; font-size:.86rem; }
+        @media(max-width:1100px){ .metric-grid,.info-grid,.report-grid,.chart-grid{grid-template-columns:1fr 1fr;} }
+        @media(max-width:760px){ .metric-grid,.info-grid,.report-grid,.chart-grid{grid-template-columns:1fr;} }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+            <div>
+                <div class="accent fw-bold small">AKADEMIK LSTM DEGERLENDIRME</div>
+                <h1 class="fw-bold mb-1">{{ display_name|default:ticker }} Model Performansi</h1>
+                <p class="muted mb-0">Hedef hizalamasi, yon dogrulugu, FinBERT katkisi ve feature ablation sonuclari tek panelde gosterilir.</p>
+            </div>
+            <a class="terminal-btn" href="{% url 'index' %}">Analiz Paneline Don</a>
+        </div>
+
+        <form method="GET" class="panel p-3 mb-4">
+            <div class="row g-2">
+                <div class="col-md-9"><input class="form-control" name="ticker" value="{{ ticker }}" placeholder="Apple, NVIDIA, THYAO.IS, Bitcoin"></div>
+                <div class="col-md-3 d-grid"><button class="btn btn-warning fw-bold">Performans Raporu Uret</button></div>
+            </div>
+        </form>
+
+        {% if report.error %}
+        <div class="alert alert-danger">{{ report.error }}</div>
+        {% endif %}
+
+        {% if report.metrics %}
+        <section class="metric-grid mb-4">
+            <div class="metric-card"><div class="metric-label">Performance Score</div><div class="metric-value">%{{ report.metrics.performance_score }}</div></div>
+            <div class="metric-card"><div class="metric-label">MAPE</div><div class="metric-value">%{{ report.metrics.mape }}</div></div>
+            <div class="metric-card"><div class="metric-label">MAE</div><div class="metric-value">{{ currency_symbol }}{{ report.metrics.mae }}</div></div>
+            <div class="metric-card"><div class="metric-label">RMSE</div><div class="metric-value">{{ currency_symbol }}{{ report.metrics.rmse }}</div></div>
+            <div class="metric-card"><div class="metric-label">R²</div><div class="metric-value">{{ report.metrics.r2 }}</div></div>
+            <div class="metric-card"><div class="metric-label">Direction Accuracy</div><div class="metric-value">%{{ report.metrics.direction_accuracy }}</div></div>
+        </section>
+
+        <section class="panel p-4 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h4 class="mb-0">LSTM vs Naive Baseline</h4>
+                <span class="muted">Naive: bugunun tahmini = onceki kapanis</span>
+            </div>
+            <div class="table-responsive">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>MAE</th>
+                            <th>RMSE</th>
+                            <th>MAPE</th>
+                            <th>R²</th>
+                            <th>Direction</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ report.metrics.variant_name|default:"LSTM" }}</td>
+                            <td>{{ currency_symbol }}{{ report.metrics.mae }}</td>
+                            <td>{{ currency_symbol }}{{ report.metrics.rmse }}</td>
+                            <td>%{{ report.metrics.mape }}</td>
+                            <td>{{ report.metrics.r2 }}</td>
+                            <td>%{{ report.metrics.direction_accuracy }}</td>
+                        </tr>
+                        <tr>
+                            <td>Naive Baseline</td>
+                            <td>{{ currency_symbol }}{{ report.metrics.naive_baseline.mae }}</td>
+                            <td>{{ currency_symbol }}{{ report.metrics.naive_baseline.rmse }}</td>
+                            <td>%{{ report.metrics.naive_baseline.mape }}</td>
+                            <td>{{ report.metrics.naive_baseline.r2 }}</td>
+                            <td>%{{ report.metrics.naive_baseline.direction_accuracy }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="reason-card mt-3">
+                <div><strong>Naive fiyat kuralı:</strong> {{ report.metrics.naive_baseline.price_rule }}</div>
+                <div><strong>Naive yön kuralı:</strong> {{ report.metrics.naive_baseline.direction_rule }}</div>
+                <div><strong>Eski nötr-kural sonucu:</strong> %{{ report.metrics.naive_baseline.direction_accuracy_neutral_rule }}</div>
+                <div><strong>actual_direction örneği:</strong> {{ report.metrics.naive_baseline.direction_sample.actual_direction_head }}</div>
+                <div><strong>predicted_direction örneği:</strong> {{ report.metrics.naive_baseline.direction_sample.predicted_direction_head }}</div>
+            </div>
+        </section>
+
+        <section class="panel p-4 mb-4">
+            <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center mb-2">
+                <h4 class="mb-0">Skor Formulu</h4>
+                {% if report.best_model.name %}
+                <span class="best-badge">{{ report.best_model.name }} · Seq {{ report.best_model.sequence_length }}</span>
+                {% endif %}
+            </div>
+            <div class="formula">{{ report.metrics.performance_score_formula }}</div>
+        </section>
+        {% endif %}
+
+        <section class="chart-grid mb-4">
+            <div class="panel p-4">
+                <h4 class="mb-3">Gercek Fiyat vs Tahmin</h4>
+                <div class="chart-wrap tall">
+                    <canvas id="performanceChart"></canvas>
+                    <div class="empty-state mt-2 d-none" id="performanceChartEmpty">Grafik verisi yuklenemedi.</div>
+                </div>
+            </div>
+            <div class="panel p-4">
+                <h4 class="mb-3">Residual Grafigi</h4>
+                <div class="chart-wrap tall">
+                    <canvas id="residualChart"></canvas>
+                    <div class="empty-state mt-2 d-none" id="residualChartEmpty">Grafik verisi yuklenemedi.</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="chart-grid mb-4">
+            <div class="panel p-4">
+                <h4 class="mb-3">Direction Accuracy Grafigi</h4>
+                <div class="chart-wrap">
+                    <canvas id="directionChart"></canvas>
+                    <div class="empty-state mt-2 d-none" id="directionChartEmpty">Grafik verisi yuklenemedi.</div>
+                </div>
+            </div>
+            <div class="panel p-4">
+                <h4 class="mb-3">Sentiment Dagilimi</h4>
+                <div class="chart-wrap">
+                    <canvas id="sentimentChart"></canvas>
+                    <div class="empty-state mt-2 d-none" id="sentimentChartEmpty">Grafik verisi yuklenemedi.</div>
+                </div>
+            </div>
+        </section>
+
+        {% if report.comparison %}
+        <section class="panel p-4 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h4 class="mb-0">Model Karsilastirmasi</h4>
+                <span class="muted">Her modelin en iyi sequence length sonucu gosterilir.</span>
+            </div>
+            <div class="table-responsive mb-3">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Seq</th>
+                            <th>MAE</th>
+                            <th>RMSE</th>
+                            <th>MAPE</th>
+                            <th>R²</th>
+                            <th>Direction</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in report.comparison %}
+                        <tr>
+                            <td>{{ item.variant_name }}</td>
+                            <td>{{ item.sequence_length }}</td>
+                            <td>{{ currency_symbol }}{{ item.mae }}</td>
+                            <td>{{ currency_symbol }}{{ item.rmse }}</td>
+                            <td>%{{ item.mape }}</td>
+                            <td>{{ item.r2 }}</td>
+                            <td>%{{ item.direction_accuracy }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="comparisonChart"></canvas>
+                <div class="empty-state mt-2 d-none" id="comparisonChartEmpty">Grafik verisi yuklenemedi.</div>
+            </div>
+        </section>
+        {% endif %}
+
+        {% if report.feature_contribution %}
+        <section class="panel p-4 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h4 class="mb-0">Feature Contribution / Ablation Study</h4>
+                <span class="muted">Referans: sadece fiyat kullanan return modeli</span>
+            </div>
+            <div class="table-responsive mb-3">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Ozellik Seti</th>
+                            <th>RMSE</th>
+                            <th>MAPE</th>
+                            <th>Direction</th>
+                            <th>RMSE Delta</th>
+                            <th>Direction Delta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in report.feature_contribution %}
+                        <tr>
+                            <td>{{ item.label }}</td>
+                            <td>{{ currency_symbol }}{{ item.rmse }}</td>
+                            <td>%{{ item.mape }}</td>
+                            <td>%{{ item.direction_accuracy }}</td>
+                            <td>{{ item.rmse_delta_vs_price }}</td>
+                            <td>{{ item.direction_delta_vs_price }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="featureChart"></canvas>
+                <div class="empty-state mt-2 d-none" id="featureChartEmpty">Grafik verisi yuklenemedi.</div>
+            </div>
+        </section>
+        {% endif %}
+
+        {% if report.academic_report %}
+        <section class="report-grid mb-4">
+            <div class="panel p-4">
+                <h4 class="mb-3">Akademik Sonuc</h4>
+                <p><strong>En iyi model:</strong> {{ report.academic_report.best_model }}</p>
+                <p><strong>LSTM gercekten ogreniyor mu:</strong> {{ report.academic_report.lstm_really_learns }}</p>
+                <p><strong>FinBERT katkisi:</strong> {{ report.academic_report.finbert_contribution }}</p>
+                <p><strong>Teknik gostergeler:</strong> {{ report.academic_report.technical_contribution }}</p>
+                <p class="mb-0"><strong>Akademik guvenilirlik:</strong> {{ report.academic_report.academic_reliability }}</p>
+            </div>
+            <div class="panel p-4">
+                <h4 class="mb-3">Direction Accuracy Analizi</h4>
+                <p>{{ report.academic_report.direction_accuracy_reason }}</p>
+                <p><strong>Kopyalama analizi:</strong> {{ report.academic_report.copying_previous_assessment }}</p>
+                <p><strong>Gecikme analizi:</strong> {{ report.academic_report.lag_problem_assessment }}</p>
+                <p><strong>Return analizi:</strong> {{ report.academic_report.return_assessment }}</p>
+                <p><strong>Veri sizintisi kontrolu:</strong> {{ report.academic_report.data_leakage_check }}</p>
+                <p class="mb-0"><strong>Dogru / Yanlis yon:</strong> {{ report.academic_report.direction_summary.correct_count }} / {{ report.academic_report.direction_summary.incorrect_count }}</p>
+            </div>
+        </section>
+        {% endif %}
+
+        {% if report.metrics.lag_analysis %}
+        <section class="panel p-4 mb-4">
+            <h4 class="mb-3">Gecikme ve Hizalama Analizi</h4>
+            <div class="info-grid">
+                <div class="info-box"><div class="muted small">corr(predicted, actual)</div><strong>{{ report.metrics.lag_analysis.corr_predicted_actual }}</strong></div>
+                <div class="info-box"><div class="muted small">corr(predicted, previous)</div><strong>{{ report.metrics.lag_analysis.corr_predicted_previous }}</strong></div>
+                <div class="info-box"><div class="muted small">corr(predicted, actual[t-1])</div><strong>{{ report.metrics.lag_analysis.corr_predicted_actual_shifted }}</strong></div>
+                <div class="info-box"><div class="muted small">Copy-like ratio</div><strong>%{{ report.metrics.lag_analysis.copy_like_ratio_pct }}</strong></div>
+                <div class="info-box"><div class="muted small">Return mean / std</div><strong>{{ report.metrics.return_analysis.mean }} / {{ report.metrics.return_analysis.std }}</strong></div>
+                <div class="info-box"><div class="muted small">Return min / max</div><strong>{{ report.metrics.return_analysis.min }} / {{ report.metrics.return_analysis.max }}</strong></div>
+            </div>
+            <div class="reason-card mt-3">
+                <div>chart_label_count={{ report.metrics.alignment_report.chart_label_count }} target_index_count={{ report.metrics.alignment_report.target_index_count }}</div>
+                <div>labels_match_targets={{ report.metrics.alignment_report.labels_match_targets }} off_by_one_suspected={{ report.metrics.alignment_report.off_by_one_suspected }}</div>
+                <div>first_target_label={{ report.metrics.alignment_report.first_target_label }} first_previous_label={{ report.metrics.alignment_report.first_previous_label }}</div>
+                <div>last_target_label={{ report.metrics.alignment_report.last_target_label }} last_previous_label={{ report.metrics.alignment_report.last_previous_label }}</div>
+            </div>
+        </section>
+        {% endif %}
+
+        {% if report.sentiment_alignment or report.sentiment_distribution.summary %}
+        <section class="panel p-4 mb-4">
+            <h4 class="mb-3">FinBERT Incelemesi</h4>
+            <div class="info-grid">
+                <div class="info-box">
+                    <div class="muted small">Gorulen Haber</div>
+                    <strong>{{ report.sentiment_alignment.news_items_seen|default:0 }}</strong>
+                </div>
+                <div class="info-box">
+                    <div class="muted small">Hizalanan Haber</div>
+                    <strong>{{ report.sentiment_alignment.aligned_news_items|default:0 }}</strong>
+                </div>
+                <div class="info-box">
+                    <div class="muted small">Hafta Sonu / Tatil Kaydirma</div>
+                    <strong>{{ report.sentiment_alignment.weekend_or_holiday_shifted|default:0 }}</strong>
+                </div>
+                <div class="info-box">
+                    <div class="muted small">Haberli Gun Sayisi</div>
+                    <strong>{{ report.sentiment_distribution.summary.days_with_news|default:0 }}</strong>
+                </div>
+                <div class="info-box">
+                    <div class="muted small">Sifir Sentiment Orani</div>
+                    <strong>%{{ report.sentiment_distribution.summary.zero_ratio_pct|default:0 }}</strong>
+                </div>
+                <div class="info-box">
+                    <div class="muted small">Sentiment Std</div>
+                    <strong>{{ report.sentiment_distribution.summary.std_sentiment|default:0 }}</strong>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
+        {% if report.sentiment_audit %}
+        <section class="panel p-4 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h4 class="mb-0">Sentiment Pipeline Audit Log</h4>
+                <span class="muted">NewsAPI -> FinBERT -> title match -> feature frame</span>
+            </div>
+            <div class="table-responsive mb-3">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Min</th>
+                            <th>Max</th>
+                            <th>Mean</th>
+                            <th>Non-zero Rows</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in report.sentiment_audit.feature_stats %}
+                        <tr>
+                            <td>{{ item.feature }}</td>
+                            <td>{{ item.min }}</td>
+                            <td>{{ item.max }}</td>
+                            <td>{{ item.mean }}</td>
+                            <td>{{ item.non_zero_rows }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="info-grid mb-3">
+                <div class="info-box">
+                    <div class="muted small">sentiment_details bos mu</div>
+                    <strong>{{ report.sentiment_audit.sentiment_details_empty }}</strong>
+                </div>
+                <div class="info-box">
+                    <div class="muted small">Rows with any signal</div>
+                    <strong>{{ report.sentiment_audit.rows_with_any_sentiment_signal }}</strong>
+                </div>
+                <div class="info-box">
+                    <div class="muted small">Missing title matches</div>
+                    <strong>{{ report.sentiment_audit.build_sentiment_frame.missing_sentiment_details|default:0 }}</strong>
+                </div>
+            </div>
+            <div class="reason-card">
+                {% for line in report.sentiment_audit.logs %}
+                <div>{{ line }}</div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="info-grid">
+            <div class="info-box">
+                <h5>Direction Accuracy Nasil Hesaplaniyor?</h5>
+                <p class="muted mb-0">Gercek degisim = bugunku kapanis - onceki kapanis, tahmin degisimi = tahmin edilen kapanis - onceki kapanis. Isaretler ayniysa yon dogru sayiliyor.</p>
+            </div>
+            <div class="info-box">
+                <h5>FinBERT Hizalamasi</h5>
+                <p class="muted mb-0">Haber tarihi islem gunu degilse sonraki islem gunune aktariliyor. Ayni gun sentiment feature'lari ile sonraki kapanis/return hedefi ogreniliyor.</p>
+            </div>
+            <div class="info-box">
+                <h5>Veri Sizintisi</h5>
+                <p class="muted mb-0">Train-test ayrimi zaman sirasina gore yapiliyor. Scaler yalnizca train bolumune fit ediliyor ve sequence olusturulurken shuffle=False kullaniliyor.</p>
+            </div>
+        </section>
+    </main>
+
+    {{ report.chart.dates|default:"[]"|json_script:"report-chart-dates" }}
+    {{ report.chart.actual|default:"[]"|json_script:"report-chart-actual" }}
+    {{ report.chart.predicted|default:"[]"|json_script:"report-chart-predicted" }}
+    {{ report.chart.naive|default:"[]"|json_script:"report-chart-naive" }}
+    {{ report.chart.residuals|default:"[]"|json_script:"report-chart-residuals" }}
+    {{ report.chart.direction_hits|default:"[]"|json_script:"report-chart-direction-hits" }}
+    {{ report.chart.actual_direction|default:"[]"|json_script:"report-chart-actual-direction" }}
+    {{ report.chart.predicted_direction|default:"[]"|json_script:"report-chart-predicted-direction" }}
+    {{ report.comparison|default:"[]"|json_script:"report-comparison-items" }}
+    {{ report.feature_contribution|default:"[]"|json_script:"report-feature-contribution" }}
+    {{ report.sentiment_distribution.chart.labels|default:"[]"|json_script:"report-sentiment-labels" }}
+    {{ report.sentiment_distribution.chart.values|default:"[]"|json_script:"report-sentiment-values" }}
+
+    <script>
+        function parseJsonScript(id, fallback) {
+            const element = document.getElementById(id);
+            if (!element) return fallback;
+            try {
+                return JSON.parse(element.textContent);
+            } catch (error) {
+                return fallback;
+            }
+        }
+
+        function showChartIssue(chartId, message) {
+            const empty = document.getElementById(`${chartId}Empty`);
+            if (empty) {
+                empty.textContent = message;
+                empty.classList.remove('d-none');
+            }
+        }
+
+        const labels = parseJsonScript('report-chart-dates', []);
+        const actualSeries = parseJsonScript('report-chart-actual', []);
+        const predictedSeries = parseJsonScript('report-chart-predicted', []);
+        const naiveSeries = parseJsonScript('report-chart-naive', []);
+        const residualSeries = parseJsonScript('report-chart-residuals', []);
+        const directionHits = parseJsonScript('report-chart-direction-hits', []);
+        const actualDirection = parseJsonScript('report-chart-actual-direction', []);
+        const predictedDirection = parseJsonScript('report-chart-predicted-direction', []);
+        const comparisonItems = parseJsonScript('report-comparison-items', []);
+        const featureContribution = parseJsonScript('report-feature-contribution', []);
+        const sentimentChartLabels = parseJsonScript('report-sentiment-labels', []);
+        const sentimentChartValues = parseJsonScript('report-sentiment-values', []);
+        const currencySymbol = "{{ currency_symbol|default:'$' }}";
+
+        function axisCurrency(value) {
+            return `${currencySymbol}${Number(value).toFixed(2)}`;
+        }
+
+        if (typeof Chart === 'undefined') {
+            showChartIssue('performanceChart', 'Chart.js yuklenemedi. Internet baglantisi veya CDN erisimi kontrol edilmeli.');
+            showChartIssue('residualChart', 'Chart.js yuklenemedi. Internet baglantisi veya CDN erisimi kontrol edilmeli.');
+            showChartIssue('directionChart', 'Chart.js yuklenemedi. Internet baglantisi veya CDN erisimi kontrol edilmeli.');
+            showChartIssue('sentimentChart', 'Chart.js yuklenemedi. Internet baglantisi veya CDN erisimi kontrol edilmeli.');
+            showChartIssue('comparisonChart', 'Chart.js yuklenemedi. Internet baglantisi veya CDN erisimi kontrol edilmeli.');
+            showChartIssue('featureChart', 'Chart.js yuklenemedi. Internet baglantisi veya CDN erisimi kontrol edilmeli.');
+        } else if (labels.length) {
+            new Chart(document.getElementById('performanceChart'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label:'Gercek Kapanis', data:actualSeries, borderColor:'#f0b90b', borderWidth:3, pointRadius:0 },
+                        { label:'LSTM Tahmini', data:predictedSeries, borderColor:'#4ea3ff', borderWidth:3, pointRadius:0 },
+                        { label:'Naive Baseline', data:naiveSeries, borderColor:'#8b97ab', borderWidth:2, borderDash:[8,6], pointRadius:0 }
+                    ]
+                },
+                options: {
+                    responsive:true,
+                    maintainAspectRatio:false,
+                    plugins:{
+                        legend:{ labels:{ color:'#cbd6e5' } },
+                        tooltip:{
+                            callbacks:{
+                                label: context => `${context.dataset.label}: ${axisCurrency(context.parsed.y)}`,
+                                afterBody: items => {
+                                    if (!items.length) return '';
+                                    const index = items[0].dataIndex;
+                                    const actual = Number(actualSeries[index] || 0);
+                                    const predicted = Number(predictedSeries[index] || 0);
+                                    return `Fark: ${axisCurrency(predicted - actual)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales:{
+                        x:{ ticks:{ color:'#7f8da3' }, grid:{ display:false } },
+                        y:{ ticks:{ color:'#7f8da3', callback: value => axisCurrency(value) }, grid:{ color:'#1b2636' } }
+                    }
+                }
+            });
+
+            new Chart(document.getElementById('residualChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label:'Residual',
+                        data: residualSeries,
+                        backgroundColor: residualSeries.map(value => value >= 0 ? 'rgba(78,163,255,.7)' : 'rgba(255,77,93,.7)'),
+                        borderWidth:0
+                    }]
+                },
+                options: {
+                    responsive:true,
+                    maintainAspectRatio:false,
+                    plugins:{ legend:{ labels:{ color:'#cbd6e5' } } },
+                    scales:{
+                        x:{ ticks:{ color:'#7f8da3', maxTicksLimit:8 }, grid:{ display:false } },
+                        y:{ ticks:{ color:'#7f8da3', callback: value => axisCurrency(value) }, grid:{ color:'#1b2636' } }
+                    }
+                }
+            });
+
+            new Chart(document.getElementById('directionChart'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label:'Gercek Yon', data: actualDirection, borderColor:'#f0b90b', borderWidth:2, pointRadius:0, stepped:true },
+                        { label:'Tahmin Yon', data: predictedDirection, borderColor:'#4ea3ff', borderWidth:2, pointRadius:0, stepped:true },
+                        { label:'Dogru Tahmin', data: directionHits, borderColor:'#00c176', borderWidth:2, pointRadius:0, stepped:true, yAxisID:'y2' }
+                    ]
+                },
+                options: {
+                    responsive:true,
+                    maintainAspectRatio:false,
+                    plugins:{ legend:{ labels:{ color:'#cbd6e5' } } },
+                    scales:{
+                        x:{ ticks:{ color:'#7f8da3', maxTicksLimit:8 }, grid:{ display:false } },
+                        y:{ min:-1.2, max:1.2, ticks:{ color:'#7f8da3', callback:value => ({'-1':'Asagi','0':'Notr','1':'Yukari'}[value] || value) }, grid:{ color:'#1b2636' } },
+                        y2:{ position:'right', min:0, max:1.2, ticks:{ color:'#7f8da3', callback:value => value === 1 ? 'Dogru' : value === 0 ? 'Yanlis' : '' }, grid:{ display:false } }
+                    }
+                }
+            });
+        } else {
+            showChartIssue('performanceChart', 'Grafik icin yeterli performans verisi bulunamadi.');
+            showChartIssue('residualChart', 'Grafik icin yeterli performans verisi bulunamadi.');
+            showChartIssue('directionChart', 'Grafik icin yeterli performans verisi bulunamadi.');
+        }
+
+        if (typeof Chart !== 'undefined' && sentimentChartLabels.length) {
+            new Chart(document.getElementById('sentimentChart'), {
+                type: 'bar',
+                data: {
+                    labels: sentimentChartLabels,
+                    datasets: [{
+                        label:'Gun Sayisi',
+                        data: sentimentChartValues,
+                        backgroundColor:['#00c176','#ff4d5d','#7f8da3','#243044'],
+                        borderWidth:0
+                    }]
+                },
+                options: {
+                    responsive:true,
+                    maintainAspectRatio:false,
+                    plugins:{ legend:{ labels:{ color:'#cbd6e5' } } },
+                    scales:{
+                        x:{ ticks:{ color:'#7f8da3' }, grid:{ display:false } },
+                        y:{ ticks:{ color:'#7f8da3' }, grid:{ color:'#1b2636' } }
+                    }
+                }
+            });
+        } else if (typeof Chart !== 'undefined') {
+            showChartIssue('sentimentChart', 'Sentiment grafigi icin kullanilabilir veri yok.');
+        }
+
+        if (typeof Chart !== 'undefined' && comparisonItems.length) {
+            new Chart(document.getElementById('comparisonChart'), {
+                type: 'bar',
+                data: {
+                    labels: comparisonItems.map(item => item.variant_name),
+                    datasets: [
+                        { label:'RMSE', data: comparisonItems.map(item => item.rmse), backgroundColor:'rgba(240,185,11,.75)' },
+                        { label:'Direction Accuracy', data: comparisonItems.map(item => item.direction_accuracy), backgroundColor:'rgba(78,163,255,.75)' }
+                    ]
+                },
+                options: {
+                    responsive:true,
+                    maintainAspectRatio:false,
+                    plugins:{ legend:{ labels:{ color:'#cbd6e5' } } },
+                    scales:{
+                        x:{ ticks:{ color:'#7f8da3' }, grid:{ display:false } },
+                        y:{ ticks:{ color:'#7f8da3' }, grid:{ color:'#1b2636' } }
+                    }
+                }
+            });
+        } else if (typeof Chart !== 'undefined') {
+            showChartIssue('comparisonChart', 'Model karsilastirma verisi bulunamadi.');
+        }
+
+        if (typeof Chart !== 'undefined' && featureContribution.length) {
+            new Chart(document.getElementById('featureChart'), {
+                type: 'bar',
+                data: {
+                    labels: featureContribution.map(item => item.label),
+                    datasets: [
+                        { label:'RMSE Delta', data: featureContribution.map(item => item.rmse_delta_vs_price), backgroundColor:'rgba(255,77,93,.75)' },
+                        { label:'Direction Delta', data: featureContribution.map(item => item.direction_delta_vs_price), backgroundColor:'rgba(0,193,118,.75)' }
+                    ]
+                },
+                options: {
+                    responsive:true,
+                    maintainAspectRatio:false,
+                    plugins:{ legend:{ labels:{ color:'#cbd6e5' } } },
+                    scales:{
+                        x:{ ticks:{ color:'#7f8da3' }, grid:{ display:false } },
+                        y:{ ticks:{ color:'#7f8da3' }, grid:{ color:'#1b2636' } }
+                    }
+                }
+            });
+        } else if (typeof Chart !== 'undefined') {
+            showChartIssue('featureChart', 'Feature contribution verisi bulunamadi.');
+        }
+    </script>
+</body>
+</html>

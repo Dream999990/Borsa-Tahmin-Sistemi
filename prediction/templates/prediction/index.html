@@ -1,197 +1,1071 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Borsa Tahmin Sistemi</title>
+    <title>Borsa Tahmin ve Analiz Terminali</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{% static 'prediction/css/dashboard.css' %}" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .stock-card { border-radius: 15px; border: none; transition: transform 0.2s; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .stock-card:hover { transform: translateY(-5px); }
-        .sentiment-positive { color: #28a745; font-weight: bold; }
-        .sentiment-negative { color: #dc3545; font-weight: bold; }
-        
-        /* Arama Alanı ve Autocomplete Stilleri */
-        .search-container { position: relative; width: 100%; }
+        :root {
+            --bg: #05070b;
+            --panel: #0d121c;
+            --panel-soft: #121a27;
+            --panel-strong: #070b11;
+            --ink: #f2f5f9;
+            --muted: #7f8da3;
+            --line: #243044;
+            --primary: #f0b90b;
+            --blue: #4ea3ff;
+            --success: #00c176;
+            --danger: #ff4d5d;
+            --warning: #f0b90b;
+        }
+
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(78, 163, 255, .12), transparent 32rem),
+                linear-gradient(180deg, #05070b 0%, #080d14 46%, #05070b 100%);
+            color: var(--ink);
+            font-family: "Segoe UI", Arial, sans-serif;
+            padding-bottom: 54px;
+        }
+
+        .terminal-bar {
+            background: #020408;
+            border-bottom: 1px solid var(--line);
+            color: var(--muted);
+            font-size: .78rem;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        .terminal-bar-inner {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 9px 18px;
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .terminal-dot {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: var(--success);
+            box-shadow: 0 0 14px var(--success);
+            margin-right: 8px;
+        }
+
+        .app-shell {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 24px 18px 42px;
+        }
+
+        .topbar {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 18px;
+            align-items: end;
+            margin-bottom: 18px;
+        }
+
+        .brand-kicker {
+            color: var(--primary);
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .brand-title {
+            font-size: clamp(1.7rem, 3vw, 2.6rem);
+            font-weight: 850;
+            margin: 0;
+        }
+
+        .brand-subtitle {
+            color: var(--muted);
+            margin: 5px 0 0;
+        }
+
+        .session-chip {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 10px 12px;
+            min-width: 220px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+        }
+
+        .session-chip span {
+            color: var(--muted);
+            display: block;
+            font-size: .78rem;
+        }
+
+        .session-chip strong {
+            color: var(--success);
+            font-size: 1.05rem;
+        }
+
+        .search-panel {
+            background: linear-gradient(180deg, #111927, #0c121d);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 18px 46px rgba(0, 0, 0, .34);
+        }
+
+        .search-container {
+            position: relative;
+        }
+
+        .form-control {
+            background: #070b12;
+            border-color: #2b3a52;
+            color: var(--ink);
+            min-height: 52px;
+        }
+
+        .form-control:focus {
+            background: #070b12;
+            border-color: var(--primary);
+            color: var(--ink);
+            box-shadow: 0 0 0 .2rem rgba(240, 185, 11, .15);
+        }
+
+        .form-control::placeholder {
+            color: #6f7d90;
+        }
+
+        .btn-primary {
+            --bs-btn-bg: var(--primary);
+            --bs-btn-border-color: var(--primary);
+            --bs-btn-hover-bg: #d9a708;
+            --bs-btn-hover-border-color: #d9a708;
+            --bs-btn-color: #111;
+            --bs-btn-hover-color: #111;
+            font-weight: 800;
+        }
+
+        .btn-outline-primary,
+        .btn-outline-danger,
+        .btn-outline-dark {
+            --bs-btn-color: #c6d2e1;
+            --bs-btn-border-color: #34435a;
+            --bs-btn-hover-bg: #182235;
+            --bs-btn-hover-border-color: var(--primary);
+            --bs-btn-hover-color: #fff;
+        }
+
         .autocomplete-items {
             position: absolute;
-            border: 1px solid #d4d4d4;
-            border-top: none;
             z-index: 999;
-            top: 100%;
+            top: calc(100% + 6px);
             left: 0;
             right: 0;
-            border-radius: 0 0 15px 15px;
-            max-height: 250px;
+            max-height: 280px;
             overflow-y: auto;
-            background: white;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            background: #0a1019;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            box-shadow: 0 20px 42px rgba(0, 0, 0, .45);
         }
+
         .autocomplete-item {
-            padding: 12px 20px;
+            padding: 12px 14px;
             cursor: pointer;
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #f8f9fa;
+            gap: 12px;
+            border-bottom: 1px solid #1a2535;
+            color: #dbe5f2;
         }
-        .autocomplete-item:hover { background-color: #f1f7ff; }
-        .autocomplete-item strong { color: #0d6efd; }
 
-        .chart-container { 
-            background: white; 
-            border-radius: 15px; 
-            padding: 20px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
-            position: relative; 
-            height: 450px; 
-            width: 100%;
+        .autocomplete-item strong {
+            color: var(--primary);
         }
-        .header-section { margin-bottom: 40px; }
-        .news-item { border-left: 4px solid #0d6efd; transition: all 0.2s; }
-        .news-item:hover { background-color: #f1f7ff !important; }
-        .progress { background-color: #e9ecef; border-radius: 10px; height: 10px; }
+
+        .autocomplete-item:hover {
+            background: #151f2e;
+        }
+
+        .quick-picks {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .main-tabbar {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 14px 0 4px;
+            padding: 10px;
+            background: rgba(5, 7, 11, .82);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            backdrop-filter: blur(14px);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, .24);
+        }
+
+        .main-tab {
+            border: 1px solid #34435a;
+            background: #0a1019;
+            color: #c8d4e4;
+            border-radius: 8px;
+            padding: 10px 13px;
+            font-weight: 850;
+            text-decoration: none;
+        }
+
+        .main-tab.active,
+        .main-tab:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #0b0d10;
+        }
+
+        .metric-card,
+        .panel {
+            background: linear-gradient(180deg, var(--panel-soft), var(--panel));
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            box-shadow: 0 16px 38px rgba(0, 0, 0, .28);
+        }
+
+        .metric-card {
+            padding: 16px;
+            height: 100%;
+        }
+
+        .metric-label {
+            color: var(--muted);
+            font-size: .75rem;
+            font-weight: 800;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            color: var(--ink);
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+            font-size: 1.45rem;
+            font-weight: 800;
+            margin: 0;
+        }
+
+        .metric-note {
+            color: var(--muted);
+            margin: 8px 0 0;
+            font-size: .86rem;
+        }
+
+        .hero-panel {
+            background:
+                linear-gradient(135deg, rgba(240, 185, 11, .13), transparent 38%),
+                linear-gradient(180deg, #101826, #090e16);
+            border: 1px solid #2e3d55;
+            color: #fff;
+            border-radius: 8px;
+            padding: 22px;
+            margin-top: 18px;
+            box-shadow: 0 24px 54px rgba(0, 0, 0, .35);
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: 1.2fr .8fr;
+            gap: 18px;
+            align-items: stretch;
+        }
+
+        .ticker-name {
+            color: var(--primary);
+            font-size: .82rem;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .price {
+            color: #fff;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+            font-size: clamp(2.4rem, 6vw, 5rem);
+            line-height: 1;
+            font-weight: 850;
+            margin: 8px 0 12px;
+        }
+
+        .change-pill {
+            display: inline-flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-weight: 750;
+            background: rgba(255, 255, 255, .06);
+            border: 1px solid rgba(255, 255, 255, .10);
+        }
+
+        .decision-box {
+            background: rgba(3, 6, 12, .66);
+            border: 1px solid #33435d;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+        }
+
+        .decision-row {
+            color: #d7e1ef;
+            border-top: 1px solid #243044;
+            padding-top: 9px;
+            margin-top: 9px;
+        }
+
+        .chart-panel {
+            padding: 18px;
+            height: 470px;
+        }
+
+        .chart-wrap {
+            position: relative;
+            height: 380px;
+        }
+
+        .data-table {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 18px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #243044;
+            color: #c8d4e4;
+        }
+
+        .data-row span {
+            color: var(--muted);
+        }
+
+        .news-item {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            gap: 12px;
+            border: 1px solid #263449;
+            border-left: 4px solid var(--primary);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            background: #0a1019;
+        }
+
+        .news-item.no-image {
+            grid-template-columns: 1fr;
+        }
+
+        .news-thumb {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #111927;
+            border: 1px solid #263449;
+        }
+
+        .news-toolbar {
+            display: grid;
+            grid-template-columns: 1fr 190px;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .news-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .news-tab {
+            border: 1px solid #34435a;
+            background: #0a1019;
+            color: #c8d4e4;
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-weight: 800;
+        }
+
+        .news-tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #0b0d10;
+        }
+
+        .news-panel {
+            display: none;
+        }
+
+        .news-panel.active {
+            display: block;
+        }
+
+        .news-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            color: var(--muted);
+            font-size: .82rem;
+            margin-top: 7px;
+        }
+
+        .news-link {
+            color: #dfe7f2;
+            text-decoration: none;
+        }
+
+        .news-link:hover {
+            color: var(--primary);
+        }
+
+        .sentiment-pill {
+            border-radius: 999px;
+            padding: 3px 8px;
+            background: #111927;
+            border: 1px solid #2d3d55;
+            font-weight: 800;
+        }
+
+        .reason-card {
+            background: #0a1019;
+            border: 1px solid #263449;
+            border-radius: 8px;
+            padding: 11px 12px;
+            margin-bottom: 8px;
+            color: #d8e2ef;
+        }
+
+        .sentiment-bars {
+            display: grid;
+            gap: 9px;
+        }
+
+        .sentiment-row {
+            display: grid;
+            grid-template-columns: 72px 1fr 34px;
+            gap: 9px;
+            align-items: center;
+            color: var(--muted);
+            font-size: .9rem;
+        }
+
+        .sentiment-track {
+            height: 9px;
+            background: #1b2636;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .sentiment-fill {
+            height: 100%;
+            border-radius: 999px;
+        }
+
+        .text-muted {
+            color: var(--muted) !important;
+        }
+
+        .text-success {
+            color: var(--success) !important;
+        }
+
+        .text-danger {
+            color: var(--danger) !important;
+        }
+
+        .text-warning {
+            color: var(--warning) !important;
+        }
+
+        .text-primary {
+            color: var(--blue) !important;
+        }
+
+        .badge.text-bg-light {
+            background: #101927 !important;
+            color: #cdd8e7 !important;
+            border-color: #2d3d55 !important;
+        }
+
+        .progress {
+            background: #1b2636;
+        }
+
+        .market-tape {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1030;
+            height: 42px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            background: #020408;
+            border-top: 1px solid #2b3a52;
+            box-shadow: 0 -12px 28px rgba(0, 0, 0, .35);
+        }
+
+        .market-tape-label {
+            position: relative;
+            z-index: 2;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            background: var(--primary);
+            color: #0b0d10;
+            font-weight: 900;
+            font-size: .82rem;
+            letter-spacing: .04em;
+            white-space: nowrap;
+        }
+
+        .market-tape-track {
+            display: flex;
+            min-width: max-content;
+            animation: ticker-scroll 34s linear infinite;
+        }
+
+        .market-tape:hover .market-tape-track {
+            animation-play-state: paused;
+        }
+
+        .ticker-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 20px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+            font-size: .9rem;
+            white-space: nowrap;
+        }
+
+        .ticker-symbol {
+            color: #fff;
+            font-weight: 900;
+        }
+
+        .ticker-price {
+            color: #cbd6e5;
+        }
+
+        .ticker-up {
+            color: var(--success);
+        }
+
+        .ticker-down {
+            color: var(--danger);
+        }
+
+        @keyframes ticker-scroll {
+            from {
+                transform: translateX(0);
+            }
+            to {
+                transform: translateX(-50%);
+            }
+        }
+
+        @media (max-width: 800px) {
+            .topbar,
+            .hero-grid {
+                display: block;
+            }
+
+            .session-chip {
+                margin-top: 14px;
+            }
+
+            .data-table {
+                grid-template-columns: 1fr;
+            }
+
+            .news-toolbar {
+                grid-template-columns: 1fr;
+            }
+
+            .news-item {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-panel {
+                height: 420px;
+            }
+
+            .chart-wrap {
+                height: 320px;
+            }
+
+            .market-tape-label {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <div class="text-center header-section">
-            <h1 class="display-4 fw-bold text-dark">📈 Borsa Tahmin & Analiz</h1>
-            <p class="lead text-secondary">Yapay Zeka ve Teknik Göstergelerle Akıllı Yatırım</p>
+    <div class="terminal-bar">
+        <div class="terminal-bar-inner">
+            <span><span class="terminal-dot"></span>Piyasa terminali aktif</span>
+            <span>BIST · NASDAQ · KRIPTO · HABER DUYGUSU · LSTM TAHMIN</span>
+            <span id="clock">--:--:--</span>
         </div>
+    </div>
 
-        <div class="row justify-content-center">
-            <div class="col-md-7">
-                <div class="search-container">
-                    <form method="POST" class="input-group shadow-sm" style="border-radius: 15px; overflow: hidden;" id="stockForm">
-                        {% csrf_token %}
-                        <input type="text" name="ticker" id="tickerInput" class="form-control border-0 p-3" 
-                               placeholder="Şirket adı veya kod yazın (Örn: Apple, NVDA, THYAO...)" 
-                               autocomplete="off" required>
-                        <button class="btn btn-primary px-4 d-flex align-items-center" type="submit" id="analyzeBtn">
-                            <span id="btnText">Analiz Et</span>
-                            <div id="btnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></div>
-                        </button>
-                    </form>
-                    <div id="autocomplete-list" class="autocomplete-items"></div>
-                </div>
-
-                <div class="text-center mt-3 mb-4">
-                    <small class="text-muted fw-bold me-2">POPÜLER:</small>
-                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 me-1 quick-pick" data-ticker="NVDA">NVDA</button>
-                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 me-1 quick-pick" data-ticker="TSLA">TSLA</button>
-                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 me-1 quick-pick" data-ticker="AAPL">AAPL</button>
-                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 me-1 quick-pick" data-ticker="THYAO.IS">THY</button>
-                    <button type="button" class="btn btn-sm btn-outline-dark rounded-pill px-3 quick-pick" data-ticker="BTC-USD">Bitcoin</button>
-                </div>
+    <main class="app-shell">
+        <section class="topbar">
+            <div>
+                <div class="brand-kicker">AI MARKET TERMINAL</div>
+                <h1 class="brand-title">Borsa Tahmin ve Analiz Terminali</h1>
+                <p class="brand-subtitle">LSTM fiyat tahmini ve FinBERT haber duygu analiziyle hisse yön tahmini.</p>
             </div>
-        </div>
+            <div class="session-chip">
+                <span>Oturum Durumu</span>
+                <strong>Canlı İzleme Modu</strong>
+            </div>
+        </section>
+
+        <section class="search-panel" id="analysisPanel">
+            <div class="search-container">
+                <form method="POST" id="stockForm">
+                    {% csrf_token %}
+                    <div class="search-actions">
+                        <input type="text" name="ticker" id="tickerInput" class="form-control px-3"
+                               placeholder="Şirket veya varlık adı yazın: Apple, NVIDIA, Türk Hava Yolları, Bitcoin"
+                               autocomplete="off" required>
+                        <button class="btn btn-primary btn-lg" type="submit" name="action" value="predict" id="analyzeBtn">
+                            <span id="btnText">Tahmin Oluştur</span>
+                            <span id="btnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></span>
+                        </button>
+                        <button class="btn btn-outline-primary btn-lg" type="submit" name="action" value="refresh">Sonuçları Güncelle</button>
+                    </div>
+                    <div class="date-range-row">
+                        <input type="date" class="form-control" name="start_date" aria-label="Başlangıç tarihi">
+                        <input type="date" class="form-control" name="end_date" aria-label="Bitiş tarihi">
+                        <span class="text-muted small">Tarih aralığı görsel filtreleme için hazırlandı; veri yoksa sistem son 5 yıllık Yahoo Finance geçmişini kullanır.</span>
+                    </div>
+                </form>
+                <div id="autocomplete-list" class="autocomplete-items"></div>
+            </div>
+            <div class="quick-picks">
+                <button type="button" class="btn btn-sm btn-outline-primary quick-pick" data-ticker="NVDA">NVDA</button>
+                <button type="button" class="btn btn-sm btn-outline-primary quick-pick" data-ticker="TSLA">TSLA</button>
+                <button type="button" class="btn btn-sm btn-outline-primary quick-pick" data-ticker="AAPL">AAPL</button>
+                <button type="button" class="btn btn-sm btn-outline-primary quick-pick" data-ticker="GOOGL">GOOGL</button>
+                <button type="button" class="btn btn-sm btn-outline-danger quick-pick" data-ticker="THYAO.IS">THYAO</button>
+                <button type="button" class="btn btn-sm btn-outline-dark quick-pick" data-ticker="BTC-USD">Bitcoin</button>
+            </div>
+        </section>
+
+        <nav class="main-tabbar" aria-label="Ana sekmeler">
+            <button type="button" class="main-tab active" data-scroll-target="analysisPanel">Analiz Paneli</button>
+            {% if ticker %}
+            <button type="button" class="main-tab" data-scroll-target="newsTerminal" data-open-news-tab="impact">Hisseye Etki Eden Haberler</button>
+            <a class="main-tab" href="{% url 'stock_detail' ticker %}">Hisse Detayı</a>
+            <a class="main-tab" href="{% url 'lstm_performance' %}?ticker={{ ticker }}">LSTM Performansı</a>
+            {% endif %}
+            <a class="main-tab" href="{% url 'news_page' %}">Tüm Haberler</a>
+        </nav>
 
         {% if error %}
-        <div class="alert alert-danger text-center shadow-sm" style="border-radius: 10px;">{{ error }}</div>
+        <div class="alert alert-danger mt-4 mb-0">{{ error }}</div>
         {% endif %}
 
         {% if ticker %}
-        <div class="row g-4">
-            <div class="col-md-4">
-                <div class="card stock-card p-4 text-center h-100">
-                    <h5 class="text-secondary mb-3">{{ ticker }} - Son Fiyat</h5>
-                    <h1 class="display-6 fw-bold">${{ last_price }}</h1>
+        <section class="dashboard-grid">
+            <div class="summary-card">
+                <div class="summary-label">Seçilen Varlık</div>
+                <div class="summary-value">{{ display_name|default:ticker }}</div>
+                <div class="summary-note">{{ ticker }} · {{ market_summary.quote_source }}</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Son Fiyat</div>
+                <div class="summary-value">{{ market_summary.last_price_text }}</div>
+                <div class="summary-note">Önceki kapanış: {{ market_summary.previous_close_text }}</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Sonraki Kapanış Tahmini</div>
+                <div class="summary-value">{% if prediction == "Model Eğitilmedi" %}Eğitim bekliyor{% else %}{{ market_summary.prediction_text }}{% endif %}</div>
+                <div class="summary-note">Tahmini değişim: {% if market_summary.prediction_change != None %}%{{ market_summary.prediction_change }}{% else %}N/A{% endif %}</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Performance Score</div>
+                <div class="summary-value">{% if accuracy != "N/A" %}%{{ accuracy }}{% else %}N/A{% endif %}</div>
+                <div class="summary-note">Son güncelleme: <span id="summaryClock">IST</span></div>
+            </div>
+        </section>
+
+        <section class="hero-panel">
+            <div class="hero-grid">
+                <div>
+                    <div class="ticker-name">{{ display_name|default:ticker }} canlı piyasa özeti</div>
+                    <div class="price">{{ market_summary.last_price_text }}</div>
+                    <div class="change-pill">
+                        <span class="{% if market_summary.day_change >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if market_summary.day_change >= 0 %}+{% endif %}{{ market_summary.day_change }}
+                            (%{% if market_summary.day_change_percent >= 0 %}+{% endif %}{{ market_summary.day_change_percent }})
+                        </span>
+                        <span>Önceki kapanış: {{ market_summary.previous_close_text }}</span>
+                    </div>
+                    <p class="metric-note mt-2">
+                        Veri kaynağı: {{ market_summary.quote_source }}
+                        {% if market_summary.is_realtime %}· Güncel quote{% else %}· Son kapanış{% endif %}
+                    </p>
+                </div>
+                <div class="decision-box">
+                    <div class="metric-label">Model Karar Özeti</div>
+                    <h2 class="fw-bold mb-1 text-{{ signal_class }}">{{ signal_text }}</h2>
+                    <p class="mb-3 text-muted">LSTM fiyat tahmini, FinBERT haber skoru ve teknik göstergeler birlikte değerlendirilir.</p>
+                    <div class="d-flex justify-content-between decision-row">
+                        <span>Yarın tahmini</span>
+                        <strong>{% if prediction == "Model Eğitilmedi" %}Eğitim bekliyor{% else %}{{ market_summary.prediction_text }}{% endif %}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between decision-row">
+                        <span>Beklenen değişim</span>
+                        <strong>{% if market_summary.prediction_change != None %}%{{ market_summary.prediction_change }}{% else %}N/A{% endif %}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between decision-row">
+                        <span>Performance score</span>
+                        <strong>{% if accuracy != "N/A" %}%{{ accuracy }}{% else %}N/A{% endif %}</strong>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="row g-3 mt-1">
+            <div class="col-md-6 col-xl-3">
+                <div class="metric-card">
+                    <div class="metric-label">Gün İçi Aralık</div>
+                    <p class="metric-value">{{ market_summary.day_low_text }} - {{ market_summary.day_high_text }}</p>
+                    <p class="metric-note">Açılış: {{ market_summary.open_price_text }}</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="metric-card">
+                    <div class="metric-label">Hacim</div>
+                    <p class="metric-value">{{ market_summary.volume }}</p>
+                    <p class="metric-note">20 günlük ortalama: {{ market_summary.avg_volume }}</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="metric-card">
+                    <div class="metric-label">RSI Durumu</div>
+                    <p class="metric-value text-{{ market_summary.rsi_class }}">{{ market_summary.rsi }}</p>
+                    <p class="metric-note">{{ market_summary.rsi_label }}</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="metric-card">
+                    <div class="metric-label">Risk ve Volatilite</div>
+                    <p class="metric-value text-{{ market_summary.risk_class }}">%{{ market_summary.risk_score }}</p>
+                    <p class="metric-note">{{ market_summary.risk_level }} risk · Volatilite: %{{ market_summary.volatility }}</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="row g-4 mt-2">
+            <div class="col-lg-8">
+                <div class="panel chart-panel">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <div>
+                            <h4 class="mb-1">Fiyat, Trend ve Ortalama Analizi</h4>
+                            <span class="text-muted">Son 90 işlem günü</span>
+                        </div>
+                        <div class="chart-toggle-group" aria-label="Grafik serileri">
+                            <label class="chart-toggle"><input type="checkbox" data-chart-toggle="close" checked> Gerçek Fiyat</label>
+                            <label class="chart-toggle"><input type="checkbox" data-chart-toggle="sma20" checked> SMA20</label>
+                            <label class="chart-toggle"><input type="checkbox" data-chart-toggle="sma50" checked> SMA50</label>
+                        </div>
+                    </div>
+                    <div class="chart-wrap">
+                        <canvas id="stockChart"></canvas>
+                        <div class="empty-state mt-2 d-none" id="chartEmptyState">Grafik verisi şu anda oluşturulamadı. Lütfen sembolü tekrar analiz edin veya veri kaynağını kontrol edin.</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="col-md-4">
-                <div class="card stock-card p-4 text-center h-100">
-                    <h5 class="text-secondary mb-3">Haber Duygusu</h5>
-                    <h2 class="display-6 {% if sentiment > 0 %}sentiment-positive{% else %}sentiment-negative{% endif %}">
-                        {{ sentiment|floatformat:4 }}
-                    </h2>
-                    <small class="text-muted">FinBERT Analizi</small>
+            <div class="col-lg-4">
+                <div class="panel p-4 h-100">
+                    <h4 class="mb-3">Teknik Göstergeler</h4>
+                    <div class="data-table">
+                        <div class="data-row"><span>SMA 20</span><strong>{{ market_summary.sma_20_text }}</strong></div>
+                        <div class="data-row"><span>SMA 50</span><strong>{{ market_summary.sma_50_text }}</strong></div>
+                        <div class="data-row"><span>Trend</span><strong class="text-{{ market_summary.trend_class }}">{{ market_summary.trend_strength }}</strong></div>
+                        <div class="data-row"><span>30G Tepe</span><strong>{{ market_summary.range_30_high_text }}</strong></div>
+                        <div class="data-row"><span>30G Dip</span><strong>{{ market_summary.range_30_low_text }}</strong></div>
+                        <div class="data-row"><span>FinBERT</span><strong class="{% if sentiment > 0 %}text-success{% elif sentiment < 0 %}text-danger{% else %}text-muted{% endif %}">{{ sentiment|floatformat:4 }}</strong></div>
+                    </div>
+                    {% if accuracy != "N/A" %}
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="fw-semibold">Model Performance Score</span>
+                            <strong>%{{ accuracy }}</strong>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar bg-{{ signal_class }}" role="progressbar" style="width: {{ accuracy }}%;"></div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
+        </section>
 
-            <div class="col-md-4">
-                <div class="card stock-card p-4 text-center h-100">
-                    <h5 class="text-secondary mb-3">AI Tahmini (Yarın)</h5>
-                    <h2 class="display-6 text-primary fw-bold">
-                        {% if prediction == "Model Eğitilmedi" %}
-                            <span style="font-size: 0.6em;">Eğitiliyor...</span>
-                        {% else %}
-                            ${{ prediction }}
-                        {% endif %}
-                    </h2>
-                    <small class="text-muted">LSTM Tahmini</small>
+        <section class="row g-4 mt-2">
+            <div class="col-lg-7">
+                <div class="panel p-4 h-100">
+                    <h4 class="mb-3">Tahmin Açıklaması</h4>
+                    {% for reason in decision_explanation.reasons %}
+                    <div class="reason-card">{{ reason }}</div>
+                    {% endfor %}
                 </div>
             </div>
-        </div>
-
-        {% if accuracy != "N/A" %}
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card stock-card border-start border-5 border-{{ signal_class }}" style="background: linear-gradient(to right, #ffffff, #fcfcfc);">
-                    <div class="card-body p-4">
-                        <div class="row align-items-center text-center">
-                            <div class="col-md-6 border-end">
-                                <h6 class="text-secondary text-uppercase small fw-bold">Model Güven Endeksi</h6>
-                                <h2 class="display-6 fw-bold mb-1">%{{ accuracy }}</h2>
-                                <div class="progress mx-auto" style="width: 60%;">
-                                    <div class="progress-bar bg-{{ signal_class }}" role="progressbar" style='width: {{ accuracy }}%;'></div>
-                                </div>
-                                <p class="text-muted small mt-2 mb-0">Geçmiş verilerdeki tahmin başarısı</p>
-                            </div>
-                            <div class="col-md-6">
-                                <h6 class="text-secondary text-uppercase small fw-bold">Teknik Karar Özeti</h6>
-                                <h2 class="display-5 fw-bold text-{{ signal_class }} mb-0">{{ signal_text }}</h2>
-                                <p class="text-muted small mt-2 mb-0">AI, RSI ve Trend Kombinasyonu</p>
-                            </div>
+            <div class="col-lg-5">
+                <div class="panel p-4 h-100">
+                    <h4 class="mb-3">Haber Duygu Grafiği</h4>
+                    <div class="sentiment-bars">
+                        <div class="sentiment-row">
+                            <span>Pozitif</span>
+                            <div class="sentiment-track"><div class="sentiment-fill" style="width: {{ sentiment_stats.positive_pct }}%; background: var(--success);"></div></div>
+                            <strong>{{ sentiment_stats.positive }}</strong>
+                        </div>
+                        <div class="sentiment-row">
+                            <span>Negatif</span>
+                            <div class="sentiment-track"><div class="sentiment-fill" style="width: {{ sentiment_stats.negative_pct }}%; background: var(--danger);"></div></div>
+                            <strong>{{ sentiment_stats.negative }}</strong>
+                        </div>
+                        <div class="sentiment-row">
+                            <span>Nötr</span>
+                            <div class="sentiment-track"><div class="sentiment-fill" style="width: {{ sentiment_stats.neutral_pct }}%; background: #7f8da3;"></div></div>
+                            <strong>{{ sentiment_stats.neutral }}</strong>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-        {% endif %}
+        </section>
 
-        <div class="row mt-5">
-            <div class="col-12">
-                <div class="chart-container">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h4 class="mb-0 text-dark">Fiyat ve Trend Analizi</h4>
-                        <span class="badge bg-light text-dark border p-2">Son 30 İş Günü</span>
+        <section class="row g-4 mt-2">
+            <div class="col-lg-5">
+                <div class="panel p-4 h-100">
+                    <div class="section-heading">
+                        <div>
+                            <div class="section-kicker">FinBERT Sentiment</div>
+                            <h4>Haber Duygu Özeti</h4>
+                        </div>
                     </div>
-                    <canvas id="stockChart"></canvas>
+                    <div class="sentiment-summary-grid">
+                        <div class="sentiment-stat"><span class="text-muted small">Ortalama</span><strong class="{% if sentiment > 0 %}text-success{% elif sentiment < 0 %}text-danger{% else %}text-muted{% endif %}">{{ sentiment|floatformat:4 }}</strong></div>
+                        <div class="sentiment-stat"><span class="text-muted small">Pozitif</span><strong class="text-success">{{ sentiment_stats.positive }}</strong></div>
+                        <div class="sentiment-stat"><span class="text-muted small">Negatif</span><strong class="text-danger">{{ sentiment_stats.negative }}</strong></div>
+                        <div class="sentiment-stat"><span class="text-muted small">Nötr</span><strong class="text-muted">{{ sentiment_stats.neutral }}</strong></div>
+                    </div>
+                    <p class="text-muted mb-0">FinBERT haber başlıklarını pozitif, negatif ve nötr olarak sınıflandırır; skorlar karar mekanizmasına destek olur.</p>
                 </div>
             </div>
-        </div>
+            <div class="col-lg-7">
+                <div class="panel p-4 h-100">
+                    <div class="section-heading">
+                        <div>
+                            <div class="section-kicker">Eğitim ve Test</div>
+                            <h4>Model Metrikleri</h4>
+                        </div>
+                        {% if best_model.name %}<span class="best-chip">{{ best_model.name }}</span>{% endif %}
+                    </div>
+                    {% if model_metrics %}
+                    <div class="dashboard-grid mt-0">
+                        <div class="summary-card"><div class="summary-label">MAE</div><div class="summary-value">{{ model_metrics.mae|default:"N/A" }}</div></div>
+                        <div class="summary-card"><div class="summary-label">RMSE</div><div class="summary-value">{{ model_metrics.rmse|default:"N/A" }}</div></div>
+                        <div class="summary-card"><div class="summary-label">MAPE</div><div class="summary-value">%{{ model_metrics.mape|default:"N/A" }}</div></div>
+                        <div class="summary-card"><div class="summary-label">R²</div><div class="summary-value">{{ model_metrics.r2|default:"N/A" }}</div></div>
+                    </div>
+                    {% else %}
+                    <div class="empty-state mt-0">Model metrikleri henüz yok. İlk analizden sonra eğitim çıktıları burada listelenir.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
 
-        <div class="row mt-5 mb-5">
-            <div class="col-12">
-                <div class="card stock-card p-4">
-                    <h4 class="mb-4 text-dark">Analiz Edilen Son Haberler</h4>
-                    <div class="list-group list-group-flush">
-                        {% if news_list %}
-                            {% for title, date in news_list %}
-                            <div class="list-group-item bg-transparent px-3 py-3 mb-2 news-item shadow-sm rounded">
-                                <div class="d-flex w-100 justify-content-between align-items-center">
-                                    <h6 class="mb-1 fw-bold text-dark">{{ title }}</h6>
-                                    <small class="text-muted ms-2">{{ date|slice:":10" }}</small>
-                                </div>
-                                <small class="text-primary">Haber Kaynağı Analizi</small>
-                            </div>
-                            {% endfor %}
-                        {% else %}
-                            <p class="text-muted px-3">Bu hisse için güncel haber bulunamadı.</p>
+        {% if model_comparison %}
+        <section class="panel p-4 mt-4">
+            <div class="section-heading">
+                <div>
+                    <div class="section-kicker">Karşılaştırmalı Sonuç</div>
+                    <h4>Baseline vs FinBERT vs Teknik Göstergeler</h4>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="comparison-table">
+                    <thead><tr><th>Model</th><th>Seq</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>R²</th><th>Durum</th></tr></thead>
+                    <tbody>
+                    {% for item in model_comparison %}
+                        {% if not item.error %}
+                        <tr class="{% if item.variant_name == best_model.name and item.sequence_length == best_model.sequence_length %}best-row{% endif %}">
+                            <td>{{ item.variant_name }}</td>
+                            <td>{{ item.sequence_length }}</td>
+                            <td>{{ item.mae }}</td>
+                            <td>{{ item.rmse }}</td>
+                            <td>%{{ item.mape }}</td>
+                            <td>{{ item.r2 }}</td>
+                            <td>{% if item.variant_name == best_model.name and item.sequence_length == best_model.sequence_length %}<span class="best-chip">En iyi</span>{% else %}<span class="text-muted">Test edildi</span>{% endif %}</td>
+                        </tr>
                         {% endif %}
-                    </div>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        {% endif %}
+
+        {% endif %}
+
+        {% if not ticker and not error %}
+        <section class="empty-state">
+            <h3>Analize başlamak için bir hisse veya varlık seç</h3>
+            <p>Arama kutusuna Apple, NVIDIA, Türk Hava Yolları, Bitcoin gibi bir ad yazabilir veya hızlı seçim butonlarını kullanabilirsin. Veri yoksa sistem sade bir uyarı gösterir, mock data kullanılmaz.</p>
+        </section>
+        {% endif %}
+
+        {% if ticker %}
+        <section class="panel p-4 mt-4" id="newsTerminal">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                    <h4 class="mb-1">Hisseye Etki Eden Haberler</h4>
+                    <span class="text-muted small">Bu haber başlıkları FinBERT skoruyla analiz edilip al/sat kararına dahil edilir.</span>
+                </div>
+                <a class="main-tab" href="{% url 'news_page' %}">Tüm Haberler Sayfası</a>
+            </div>
+
+            <div class="news-toolbar">
+                <input type="text" class="form-control" id="newsSearch" placeholder="Haber başlığı, kaynak veya sembol ara">
+                <select class="form-control" id="sentimentFilter">
+                    <option value="all">Tüm Duygular</option>
+                    <option value="success">Pozitif</option>
+                    <option value="danger">Negatif</option>
+                    <option value="secondary">Nötr / Skorsuz</option>
+                </select>
+            </div>
+
+            <div class="news-tabs" role="tablist">
+                <button type="button" class="news-tab active" data-news-tab="impact">Hisseye Etki Eden Haberler</button>
+                <button type="button" class="news-tab" data-news-tab="stock">Hisse Haberleri</button>
+            </div>
+
+            <div class="news-panel active" data-news-panel="impact">
+                {% if impact_news %}
+                    {% for item in impact_news %}
+                    <article class="news-item news-card {% if item.image_url %}has-image{% else %}no-image{% endif %}" data-sentiment="{{ item.sentiment_class }}" data-search="{{ item.title }} {{ item.source }} {{ ticker }}">
+                        {% if item.image_url %}
+                        <img class="news-thumb" src="{{ item.image_url }}" alt="{{ item.title }}" loading="lazy">
+                        {% endif %}
+                        <div>
+                        <div class="d-flex justify-content-between gap-3">
+                            {% if item.url %}
+                            <a class="news-link fw-bold" href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+                            {% else %}
+                            <strong>{{ item.title }}</strong>
+                            {% endif %}
+                            <span class="sentiment-pill text-{{ item.sentiment_class }}">{{ item.sentiment_label }} {{ item.sentiment_score }}</span>
+                        </div>
+                        <div class="news-meta">
+                            <span>{{ item.source }}</span>
+                            <span>{{ item.date|slice:":10" }}</span>
+                            <span>{{ ticker }} karar skoruna dahil edildi</span>
+                        </div>
+                        </div>
+                    </article>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted mb-0">Bu hisse için analiz edilecek haber bulunamadı. NewsAPI anahtarı yoksa sistem Yahoo Finance haberlerine düşer; kaynak da boş dönerse FinBERT skoru 0 kalır.</p>
+                {% endif %}
+            </div>
+
+            <div class="news-panel" data-news-panel="stock">
+                {% if news_list %}
+                    {% for item in news_list %}
+                    <article class="news-item news-card {% if item.image_url %}has-image{% else %}no-image{% endif %}" data-sentiment="{{ item.sentiment_class }}" data-search="{{ item.title }} {{ item.source }} {{ ticker }}">
+                        {% if item.image_url %}
+                        <img class="news-thumb" src="{{ item.image_url }}" alt="{{ item.title }}" loading="lazy">
+                        {% endif %}
+                        <div>
+                        <div class="d-flex justify-content-between gap-3">
+                            {% if item.url %}
+                            <a class="news-link fw-bold" href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+                            {% else %}
+                            <strong>{{ item.title }}</strong>
+                            {% endif %}
+                            <span class="sentiment-pill text-{{ item.sentiment_class }}">{{ item.sentiment_label }} {{ item.sentiment_score }}</span>
+                        </div>
+                        <div class="news-meta">
+                            <span>{{ item.source }}</span>
+                            <span>{{ item.date|slice:":10" }}</span>
+                            {% if item.summary %}<span>{{ item.summary|truncatechars:120 }}</span>{% endif %}
+                        </div>
+                        </div>
+                    </article>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted mb-0">Bu hisse için güncel haber bulunamadı.</p>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="project-info-grid">
+            <div class="panel p-4">
+                <div class="section-kicker">Proje Özeti</div>
+                <h4 class="mt-1">LSTM + FinBERT Destekli Tahmin Sistemi</h4>
+                <p class="text-muted mb-0">Sistem fiyat geçmişinden teknik göstergeler üretir, haber başlıklarını FinBERT ile skorlar ve LSTM modeliyle sonraki kapanışa yönelik tahmin üretir. Test bölümünde modelin görmediği veri kullanılır.</p>
+                <div class="source-pills">
+                    <span class="source-pill">Yahoo Finance</span>
+                    <span class="source-pill">NewsAPI</span>
+                    <span class="source-pill">FinBERT</span>
+                    <span class="source-pill">LSTM</span>
+                    <span class="source-pill">Chart.js</span>
                 </div>
             </div>
-        </div>
-        {% endif %}
-    </div>
+            <div class="disclaimer-box">
+                <strong>Uyarı</strong>
+                <p class="mb-0 mt-2">Bu uygulama akademik amaçlıdır. Üretilen tahminler yatırım tavsiyesi değildir; finansal kararlar için tek başına kullanılmamalıdır.</p>
+            </div>
+        </section>
+    </main>
+
+    <section class="market-tape" aria-label="Piyasa akışı">
+        <div class="market-tape-label">Piyasa Akışı</div>
+        <div class="market-tape-track" id="marketTape"></div>
+    </section>
 
 <script>
-    // --- 1. KAPSAMLI HİSSE LİSTESİ VE AUTOCOMPLETE ---
     const stocks = [
         { s: "NVDA", n: "NVIDIA Corporation" },
         { s: "TSLA", n: "Tesla, Inc." },
@@ -199,7 +1073,7 @@
         { s: "MSFT", n: "Microsoft Corporation" },
         { s: "GOOGL", n: "Alphabet Inc. (Google)" },
         { s: "AMZN", n: "Amazon.com, Inc." },
-        { s: "META", n: "Meta Platforms (Facebook)" },
+        { s: "META", n: "Meta Platforms" },
         { s: "NFLX", n: "Netflix, Inc." },
         { s: "AMD", n: "Advanced Micro Devices" },
         { s: "THYAO.IS", n: "Türk Hava Yolları" },
@@ -208,6 +1082,7 @@
         { s: "GARAN.IS", n: "Garanti Bankası" },
         { s: "SISE.IS", n: "Şişecam" },
         { s: "BTC-USD", n: "Bitcoin" },
+        { s: "BTC-TRY", n: "Bitcoin (Türk Lirası)" },
         { s: "ETH-USD", n: "Ethereum" },
         { s: "KO", n: "Coca-Cola Company" },
         { s: "PEP", n: "PepsiCo, Inc." },
@@ -219,100 +1094,219 @@
     const autocompleteList = document.getElementById('autocomplete-list');
 
     tickerInput.addEventListener('input', function() {
-        const val = this.value.toUpperCase();
+        const val = this.value.toUpperCase().trim();
         autocompleteList.innerHTML = '';
         if (!val) return;
 
-        const filtered = stocks.filter(stock => 
-            stock.s.includes(val) || stock.n.toUpperCase().includes(val)
-        ).slice(0, 8);
-
-        filtered.forEach(stock => {
-            const item = document.createElement('div');
-            item.className = 'autocomplete-item';
-            item.innerHTML = `<span><strong>${stock.s}</strong> - ${stock.n}</span>`;
-            item.addEventListener('click', () => {
-                tickerInput.value = stock.s;
-                autocompleteList.innerHTML = '';
-                document.getElementById('stockForm').submit();
+        stocks
+            .filter(stock => stock.s.includes(val) || stock.n.toUpperCase().includes(val))
+            .slice(0, 8)
+            .forEach(stock => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.innerHTML = `<span><strong>${stock.s}</strong> - ${stock.n}</span><span class="text-muted">Seç</span>`;
+                item.addEventListener('click', () => {
+                    tickerInput.value = stock.s;
+                    autocompleteList.innerHTML = '';
+                    document.getElementById('stockForm').submit();
+                });
+                autocompleteList.appendChild(item);
             });
-            autocompleteList.appendChild(item);
-        });
     });
 
-    // Liste dışına tıklayınca kapat
-    document.addEventListener('click', (e) => {
-        if (e.target !== tickerInput) autocompleteList.innerHTML = '';
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.search-container')) autocompleteList.innerHTML = '';
     });
 
-    // Hızlı Seçim Butonları
-    document.querySelectorAll('.quick-pick').forEach(btn => {
-        btn.addEventListener('click', function() {
+    document.querySelectorAll('.quick-pick').forEach(button => {
+        button.addEventListener('click', function() {
             tickerInput.value = this.dataset.ticker;
             document.getElementById('stockForm').submit();
         });
     });
 
-    // --- 2. FORM SUBMIT LOADING ---
-    document.getElementById('stockForm').onsubmit = function() {
-        document.getElementById('btnText').innerText = "Analiz Ediliyor...";
+    document.getElementById('stockForm').addEventListener('submit', function() {
+        document.getElementById('btnText').innerText = "Analiz Ediliyor";
         document.getElementById('btnSpinner').classList.remove('d-none');
         document.getElementById('analyzeBtn').disabled = true;
-    };
+    });
 
-    // --- 3. GRAFİK ÇİZİMİ ---
+    function openNewsTab(target) {
+        const targetButton = document.querySelector(`.news-tab[data-news-tab="${target}"]`);
+        const targetPanel = document.querySelector(`[data-news-panel="${target}"]`);
+        if (!targetButton || !targetPanel) return;
+
+        document.querySelectorAll('.news-tab').forEach(button => button.classList.remove('active'));
+        document.querySelectorAll('.news-panel').forEach(panel => panel.classList.remove('active'));
+        targetButton.classList.add('active');
+        targetPanel.classList.add('active');
+        filterNews();
+    }
+
+    document.querySelectorAll('.main-tab').forEach(tabButton => {
+        tabButton.addEventListener('click', function() {
+            const targetId = this.dataset.scrollTarget;
+            const newsTarget = this.dataset.openNewsTab;
+            if (!targetId && !newsTarget) return;
+            document.querySelectorAll('.main-tab').forEach(button => button.classList.remove('active'));
+            this.classList.add('active');
+
+            if (newsTarget) openNewsTab(newsTarget);
+            document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+
+    const tapeData = [
+        { symbol: "BIST100", price: "10.276", change: "+0.84", up: true },
+        { symbol: "THYAO", price: "305.50", change: "+1.12", up: true },
+        { symbol: "ASELS", price: "87.20", change: "-0.35", up: false },
+        { symbol: "GARAN", price: "118.90", change: "+0.48", up: true },
+        { symbol: "AAPL", price: "213.07", change: "+0.31", up: true },
+        { symbol: "NVDA", price: "144.12", change: "-0.62", up: false },
+        { symbol: "TSLA", price: "182.44", change: "+1.74", up: true },
+        { symbol: "BTC", price: "66.420", change: "-0.18", up: false },
+        { symbol: "ETH", price: "3.521", change: "+0.27", up: true }
+    ];
+
+    function renderTape() {
+        const tape = document.getElementById('marketTape');
+        const items = [...tapeData, ...tapeData].map(item => {
+            const changeClass = item.up ? 'ticker-up' : 'ticker-down';
+            return `<span class="ticker-item"><span class="ticker-symbol">${item.symbol}</span><span class="ticker-price">${item.price}</span><span class="${changeClass}">%${item.change}</span></span>`;
+        }).join('');
+        tape.innerHTML = items;
+    }
+
+    function updateClock() {
+        const clock = document.getElementById('clock');
+        const now = new Date();
+        clock.textContent = `IST ${now.toLocaleTimeString('tr-TR')}`;
+        const summaryClock = document.getElementById('summaryClock');
+        if (summaryClock) summaryClock.textContent = `IST ${now.toLocaleTimeString('tr-TR')}`;
+    }
+
+    renderTape();
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    document.querySelectorAll('.news-tab').forEach(tabButton => {
+        tabButton.addEventListener('click', function() {
+            const target = this.dataset.newsTab;
+            openNewsTab(target);
+        });
+    });
+
+    function filterNews() {
+        const searchValue = document.getElementById('newsSearch')?.value.toLowerCase().trim() || '';
+        const sentimentValue = document.getElementById('sentimentFilter')?.value || 'all';
+        const activePanel = document.querySelector('.news-panel.active');
+        if (!activePanel) return;
+
+        activePanel.querySelectorAll('.news-card').forEach(card => {
+            const text = (card.dataset.search || '').toLowerCase();
+            const sentiment = card.dataset.sentiment || 'secondary';
+            const searchMatches = !searchValue || text.includes(searchValue);
+            const sentimentMatches = sentimentValue === 'all' || sentiment === sentimentValue;
+            card.style.display = searchMatches && sentimentMatches ? '' : 'none';
+        });
+    }
+
+    document.getElementById('newsSearch')?.addEventListener('input', filterNews);
+    document.getElementById('sentimentFilter')?.addEventListener('change', filterNews);
+
     (function() {
-        try {
-            const labels = {{ chart_dates|safe|default:"[]" }};
-            const prices = {{ chart_prices|safe|default:"[]" }};
-            const sma = {{ chart_sma|safe|default:"[]" }};
+        const labels = {{ chart_dates|safe|default:"[]" }};
+        const prices = {{ chart_prices|safe|default:"[]" }};
+        const sma20 = {{ chart_sma|safe|default:"[]" }};
+        const sma50 = {{ chart_sma_50|safe|default:"[]" }};
+        const currencySymbol = "{{ market_summary.currency_symbol|default:'$' }}";
 
-            if (labels.length > 0) {
-                const ctx = document.getElementById('stockChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            {
-                                label: 'Kapanış Fiyatı',
-                                data: prices,
-                                borderColor: '#0d6efd',
-                                backgroundColor: 'rgba(13, 110, 253, 0.05)',
-                                borderWidth: 3,
-                                pointRadius: 4,
-                                fill: true,
-                                tension: 0.3
-                            },
-                            {
-                                label: 'SMA 20 (Trend)',
-                                data: sma,
-                                borderColor: '#ffc107',
-                                borderDash: [5, 5],
-                                borderWidth: 2,
-                                pointRadius: 0,
-                                fill: false,
-                                tension: 0.3
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { position: 'top' } },
-                        scales: {
-                            y: { 
-                                beginAtZero: false,
-                                ticks: { callback: function(value) { return '$' + value; } }
-                            }
-                        } 
-                    }
-                });
-            }
-        } catch (e) {
-            console.error("Grafik hatası:", e);
+        const chartEmptyState = document.getElementById('chartEmptyState');
+        if (!labels.length) {
+            chartEmptyState?.classList.remove('d-none');
+            return;
         }
+
+        const ctx = document.getElementById('stockChart').getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 360);
+        gradient.addColorStop(0, 'rgba(240, 185, 11, 0.22)');
+        gradient.addColorStop(1, 'rgba(240, 185, 11, 0.00)');
+
+        window.stockPriceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Gerçek Kapanış',
+                        datasetKey: 'close',
+                        data: prices,
+                        borderColor: '#f0b90b',
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        pointHoverRadius: 5,
+                        fill: true,
+                        tension: 0.32
+                    },
+                    {
+                        label: 'SMA 20',
+                        datasetKey: 'sma20',
+                        data: sma20,
+                        borderColor: '#4ea3ff',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        borderDash: [7, 5],
+                        tension: 0.28
+                    },
+                    {
+                        label: 'SMA 50',
+                        datasetKey: 'sma50',
+                        data: sma50,
+                        borderColor: '#8b9bb1',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        borderDash: [3, 5],
+                        tension: 0.28
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { color: '#cbd6e5', usePointStyle: true, boxWidth: 8 }
+                    },
+                    tooltip: {
+                        backgroundColor: '#05070b',
+                        borderColor: '#33435d',
+                        borderWidth: 1,
+                        titleColor: '#f2f5f9',
+                        bodyColor: '#cbd6e5',
+                        callbacks: {
+                            label: context => `${context.dataset.label}: ${currencySymbol}${Number(context.parsed.y).toFixed(2)}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#7f8da3', maxTicksLimit: 8 }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        grid: { color: '#1b2636' },
+                        ticks: { color: '#7f8da3', callback: value => currencySymbol + value }
+                    }
+                }
+            }
+        });
+        chartEmptyState?.classList.add('d-none');
     })();
 </script>
+<script src="{% static 'prediction/js/dashboard.js' %}"></script>
 </body>
 </html>

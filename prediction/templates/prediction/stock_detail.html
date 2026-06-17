@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ display_name|default:ticker }} Detay | Borsa Terminali</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background:#05070b; color:#f2f5f9; font-family:"Segoe UI",Arial,sans-serif; }
+        .shell { max-width:1180px; margin:0 auto; padding:28px 18px 52px; }
+        .panel { background:linear-gradient(180deg,#121a27,#0d121c); border:1px solid #243044; border-radius:8px; box-shadow:0 16px 38px rgba(0,0,0,.28); }
+        .muted { color:#7f8da3; }
+        .accent { color:#f0b90b; }
+        .terminal-btn { display:inline-flex; border:1px solid #34435a; background:#0a1019; color:#c8d4e4; border-radius:8px; padding:10px 13px; font-weight:850; text-decoration:none; }
+        .terminal-btn:hover { background:#f0b90b; border-color:#f0b90b; color:#0b0d10; }
+        .data-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+        .data-card { background:#0a1019; border:1px solid #263449; border-radius:8px; padding:14px; }
+        .value { font-family:"SFMono-Regular",Consolas,monospace; font-size:1.45rem; font-weight:900; }
+        @media(max-width:900px){ .data-grid{grid-template-columns:1fr 1fr;} }
+        @media(max-width:620px){ .data-grid{grid-template-columns:1fr;} }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+            <div>
+                <div class="accent fw-bold small">HİSSE PROFİLİ</div>
+                <h1 class="fw-bold mb-1">{{ profile.name|default:display_name|default:ticker }}</h1>
+                <p class="muted mb-0">{{ ticker }} · {{ profile.sector }} · {{ profile.industry }}</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a class="terminal-btn" href="{% url 'lstm_performance' %}?ticker={{ ticker }}">LSTM Performansı</a>
+                <a class="terminal-btn" href="{% url 'index' %}">Analiz Paneline Dön</a>
+            </div>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% else %}
+        <section class="data-grid mb-4">
+            <div class="data-card"><div class="muted small">Son Fiyat</div><div class="value">{{ market_summary.last_price_text }}</div></div>
+            <div class="data-card"><div class="muted small">Tahmin</div><div class="value">{{ market_summary.prediction_text }}</div></div>
+            <div class="data-card"><div class="muted small">Karar</div><div class="value text-{{ signal_class }}">{{ signal_text }}</div></div>
+            <div class="data-card"><div class="muted small">Risk Skoru</div><div class="value">%{{ market_summary.risk_score }}</div></div>
+        </section>
+        <p class="muted mb-4">Fiyat kaynağı: {{ market_summary.quote_source }}{% if market_summary.is_realtime %} · Güncel quote{% else %} · Son kapanış{% endif %}</p>
+
+        <section class="row g-4">
+            <div class="col-lg-7">
+                <div class="panel p-4 h-100">
+                    <h4>Şirket Bilgileri</h4>
+                    <p class="muted">{{ profile.summary|default:"Bu sembol için şirket açıklaması bulunamadı." }}</p>
+                    <div class="data-grid mt-3">
+                        <div><span class="muted">Ülke</span><br><strong>{{ profile.country }}</strong></div>
+                        <div><span class="muted">Beta</span><br><strong>{{ profile.beta|default:"N/A" }}</strong></div>
+                        <div><span class="muted">52H Tepe</span><br><strong>{% if profile.fifty_two_week_high %}{{ market_summary.currency_symbol }}{{ profile.fifty_two_week_high }}{% else %}N/A{% endif %}</strong></div>
+                        <div><span class="muted">52H Dip</span><br><strong>{% if profile.fifty_two_week_low %}{{ market_summary.currency_symbol }}{{ profile.fifty_two_week_low }}{% else %}N/A{% endif %}</strong></div>
+                    </div>
+                    {% if profile.website %}<a class="terminal-btn mt-3" href="{{ profile.website }}" target="_blank" rel="noopener noreferrer">Şirket Sitesi</a>{% endif %}
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="panel p-4 h-100">
+                    <h4>Karar Açıklaması</h4>
+                    {% for reason in decision_explanation.reasons %}
+                    <div class="data-card mb-2">{{ reason }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>

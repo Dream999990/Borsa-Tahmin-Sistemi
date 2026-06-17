@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tüm Haberler | Borsa Terminali</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #05070b;
+            --panel: #0d121c;
+            --panel-soft: #121a27;
+            --ink: #f2f5f9;
+            --muted: #7f8da3;
+            --line: #243044;
+            --primary: #f0b90b;
+            --success: #00c176;
+            --danger: #ff4d5d;
+        }
+
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(78, 163, 255, .12), transparent 32rem),
+                linear-gradient(180deg, #05070b 0%, #080d14 46%, #05070b 100%);
+            color: var(--ink);
+            font-family: "Segoe UI", Arial, sans-serif;
+        }
+
+        .terminal-bar {
+            background: #020408;
+            border-bottom: 1px solid var(--line);
+            color: var(--muted);
+            font-size: .78rem;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        .terminal-bar-inner,
+        .page-shell {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding-left: 18px;
+            padding-right: 18px;
+        }
+
+        .terminal-bar-inner {
+            padding-top: 9px;
+            padding-bottom: 9px;
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .page-shell {
+            padding-top: 26px;
+            padding-bottom: 52px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            align-items: end;
+            margin-bottom: 18px;
+        }
+
+        .brand-kicker {
+            color: var(--primary);
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        h1 {
+            font-size: clamp(1.8rem, 3vw, 2.8rem);
+            font-weight: 850;
+            margin: 0;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin: 6px 0 0;
+        }
+
+        .panel {
+            background: linear-gradient(180deg, var(--panel-soft), var(--panel));
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            box-shadow: 0 16px 38px rgba(0, 0, 0, .28);
+        }
+
+        .toolbar {
+            display: grid;
+            grid-template-columns: 1fr 190px 190px;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .form-control {
+            background: #070b12;
+            border-color: #2b3a52;
+            color: var(--ink);
+            min-height: 52px;
+        }
+
+        .form-control:focus {
+            background: #070b12;
+            border-color: var(--primary);
+            color: var(--ink);
+            box-shadow: 0 0 0 .2rem rgba(240, 185, 11, .15);
+        }
+
+        .form-control::placeholder {
+            color: #6f7d90;
+        }
+
+        .terminal-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #34435a;
+            background: #0a1019;
+            color: #c8d4e4;
+            border-radius: 8px;
+            padding: 10px 13px;
+            font-weight: 850;
+            text-decoration: none;
+        }
+
+        .terminal-btn:hover,
+        .terminal-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #0b0d10;
+        }
+
+        .news-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .news-card {
+            overflow: hidden;
+            border: 1px solid #263449;
+            border-left: 4px solid var(--primary);
+            border-radius: 8px;
+            background: #0a1019;
+        }
+
+        .news-image {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
+            display: block;
+            background: #111927;
+            border-bottom: 1px solid #263449;
+        }
+
+        .news-body {
+            padding: 14px;
+        }
+
+        .news-link {
+            color: #f2f5f9;
+            text-decoration: none;
+            font-weight: 850;
+        }
+
+        .news-link:hover {
+            color: var(--primary);
+        }
+
+        .news-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            color: var(--muted);
+            font-size: .83rem;
+            margin-top: 8px;
+        }
+
+        .category-pill {
+            border-radius: 999px;
+            padding: 3px 8px;
+            background: #111927;
+            border: 1px solid #2d3d55;
+            color: var(--primary);
+            font-weight: 800;
+        }
+
+        .empty {
+            color: var(--muted);
+            padding: 28px;
+            text-align: center;
+        }
+
+        @media (max-width: 800px) {
+            .topbar {
+                display: block;
+            }
+
+            .topbar .terminal-btn {
+                margin-top: 14px;
+            }
+
+            .toolbar,
+            .news-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal-bar">
+        <div class="terminal-bar-inner">
+            <span>Piyasa haber terminali</span>
+            <span>BIST · NASDAQ · KRIPTO · MAKRO · ŞIRKET HABERLERI</span>
+            <span id="clock">--:--:--</span>
+        </div>
+    </div>
+
+    <main class="page-shell">
+        <section class="topbar">
+            <div>
+                <div class="brand-kicker">NEWS TERMINAL</div>
+                <h1>Tüm Haberler</h1>
+                <p class="subtitle">Haberleri sektör veya şirket bazında filtrele, kaynaklara git ve hızlıca tara.</p>
+            </div>
+            <a class="terminal-btn" href="{% url 'index' %}">Analiz Paneline Dön</a>
+        </section>
+
+        <section class="panel p-4">
+            <div class="toolbar">
+                <input type="text" class="form-control" id="newsSearch" placeholder="Haber başlığı, kaynak, sektör veya şirket ara">
+                <select class="form-control" id="sectorFilter">
+                    <option value="all">Tüm Sektörler</option>
+                    {% for sector in sectors %}
+                    <option value="{{ sector }}">{{ sector }}</option>
+                    {% endfor %}
+                </select>
+                <select class="form-control" id="companyFilter">
+                    <option value="all">Tüm Şirketler</option>
+                    {% for company in companies %}
+                    <option value="{{ company }}">{{ company }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {% if market_news %}
+            <div class="news-grid" id="newsGrid">
+                {% for item in market_news %}
+                <article class="news-card" data-sector="{{ item.sector|default:item.category }}" data-company="{{ item.company|default:'Genel' }}" data-search="{{ item.title }} {{ item.source }} {{ item.sector }} {{ item.company }}">
+                    {% if item.image_url %}
+                    <img class="news-image" src="{{ item.image_url }}" alt="{{ item.title }}" loading="lazy">
+                    {% endif %}
+                    <div class="news-body">
+                    {% if item.url %}
+                    <a class="news-link" href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+                    {% else %}
+                    <strong>{{ item.title }}</strong>
+                    {% endif %}
+                    <div class="news-meta">
+                        <span class="category-pill">{{ item.sector|default:item.category }}</span>
+                        <span class="category-pill">{{ item.company|default:"Genel" }}</span>
+                        <span>{{ item.source }}</span>
+                        <span>{{ item.date|slice:":10" }}</span>
+                    </div>
+                    {% if item.summary %}
+                    <p class="subtitle mt-2 mb-0">{{ item.summary|truncatechars:170 }}</p>
+                    {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty">Haberler şu an çekilemedi. İnternet bağlantısı, NewsAPI anahtarı veya Yahoo Finance erişimi kontrol edilmeli.</div>
+            {% endif %}
+        </section>
+    </main>
+
+    <script>
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = `IST ${now.toLocaleTimeString('tr-TR')}`;
+        }
+
+        function filterNews() {
+            const searchValue = document.getElementById('newsSearch').value.toLowerCase().trim();
+            const sectorValue = document.getElementById('sectorFilter').value;
+            const companyValue = document.getElementById('companyFilter').value;
+
+            document.querySelectorAll('.news-card').forEach(card => {
+                const text = (card.dataset.search || '').toLowerCase();
+                const sector = card.dataset.sector || '';
+                const company = card.dataset.company || '';
+                const searchMatches = !searchValue || text.includes(searchValue);
+                const sectorMatches = sectorValue === 'all' || sector === sectorValue;
+                const companyMatches = companyValue === 'all' || company === companyValue;
+                card.style.display = searchMatches && sectorMatches && companyMatches ? '' : 'none';
+            });
+        }
+
+        updateClock();
+        setInterval(updateClock, 1000);
+        document.getElementById('newsSearch').addEventListener('input', filterNews);
+        document.getElementById('sectorFilter').addEventListener('change', filterNews);
+        document.getElementById('companyFilter').addEventListener('change', filterNews);
+    </script>
+</body>
+</html>
